@@ -1,0 +1,7 @@
+# the build output .exe file
+/bin/main.exe
+
+# include directory
+/include/
+
+/src/glad.c

@@ -18,8 +18,25 @@ int main() {
         return -1;
     }
 
+    // Full Screen
+    bool full_screen = false;
+    GLFWmonitor* monitor = NULL;
+    int win_width = 800, win_height = 600;
+    if (full_screen) {
+        monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+
+        win_width = mode->width;
+        win_height = mode->height;
+    }
+
     // create a windowed mode window
-    GLFWwindow* window = glfwCreateWindow(600, 400, "OpenGL Window", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(win_width, win_height, "OpenGL Window", monitor, NULL);
     if (!window) {
         // window or context creation failed
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -32,8 +49,8 @@ int main() {
     // use an extension loader library
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    printf("Renderer: %s.\n", glGetString(GL_RENDERER));
-    printf("OpenGL version supported %s.\n", glGetString(GL_VERSION));
+    // printf("Renderer: %s.\n", glGetString(GL_RENDERER));
+    // printf("OpenGL version supported %s.\n", glGetString(GL_VERSION));
 
     // Define a triangle in a vertex buffer
     float points[] = {
@@ -72,18 +89,68 @@ int main() {
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vs, 1, &vertex_shader, NULL);
     glCompileShader(vs);
-
+    // shader error logs
+    int params = -1;
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
+    std::cout << params << std::endl;
+    if (GL_TRUE != params) {
+        int max_length = 2048, actual_length = 0;
+        char slog[2048];
+        glGetShaderInfoLog(vs, max_length, &actual_length, slog);
+        std::cerr << "ERROR: Vertex Shader index " << vs << " did not compile.\n" << slog << std::ends;
+        return -1;
+    }
+    
     GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fs, 1, &fragment_shader, NULL);
     glCompileShader(fs);
+    // shader error logs
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &params);
+    if (GL_TRUE != params) {
+        int max_length = 2048, actual_length = 0;
+        char slog[2048];
+        glGetShaderInfoLog(fs, max_length, &actual_length, slog);
+        std::cerr << "ERROR: Fragment Shader index " << fs << " did not compile.\n" << slog << std::ends;
+        return -1;
+    }
 
     GLuint shader_program = glCreateProgram();
     glAttachShader(shader_program, fs);
     glAttachShader(shader_program, vs);
     glLinkProgram(shader_program);
 
+    // Check for linking errors
+    glGetProgramiv(shader_program, GL_LINK_STATUS, &params);
+    if (GL_TRUE != params) {
+        int max_length = 2048, actual_length = 0;
+        char plog[2048];
+        glGetProgramInfoLog(shader_program, max_length, &actual_length, plog);
+        std::cerr << "ERROR: Could not link shader program GL index " << shader_program << ".\n" << plog << std::ends;
+        return -1;
+    }
+
+    // Frame Rate Counter
+    double previous_seconds = glfwGetTime();
+    double title_countdown_seconds= 0.1;
+
     // main loop
     while (!glfwWindowShouldClose(window)) {
+
+        double current_seconds = glfwGetTime();
+        double elapsed_seconds = current_seconds - previous_seconds;
+        previous_seconds = current_seconds;
+
+        title_countdown_seconds -= elapsed_seconds;
+        if (title_countdown_seconds <= 0.0 && elapsed_seconds > 0.0) {
+            double fps = 1.0 / elapsed_seconds;
+
+            // create a string and put the FPS as the window title
+            char tmp[256];
+            sprintf(tmp, "FPS: %.2lf", fps);
+            glfwSetWindowTitle(window, tmp);
+            title_countdown_seconds = 0.1;
+        }
+
         // update window events
         glfwPollEvents();
         // wipe the drawing surface clear
@@ -97,6 +164,7 @@ int main() {
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // put the stuff we've been drawing onto the visible area
+        glfwSwapInterval(1);
         glfwSwapBuffers(window);
 
         glfwSetKeyCallback(window, key_callback);

@@ -5,40 +5,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-const int screen_width = 640;
-const int screen_height = 400;
-
-void setup_3d_transform(unsigned int shaderProgramID) {
-    // 3d to 2d
-    glm::mat4 projection = glm::perspective(
-        glm::radians(45.0f),
-        (float)screen_width / (float)screen_height,
-        0.1f,
-        100.0f
-    );
-    unsigned int projectionLoc = glGetUniformLocation(shaderProgramID, "projection");
-    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-    // define camera position and facing
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(3.0f, 3.0f, 3.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f)
-    );
-    unsigned int viewLoc = glGetUniformLocation(shaderProgramID, "view");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-
-    // define block pos
-    glm::mat4 model = glm::mat4(1.0f);
-
-    // e.g. move a block to 5
-    // model = glm::translate(model, glm::vec3(5.0f, 0.0f, 0.0f));
-
-    unsigned int modelloc = glGetUniformLocation(shaderProgramID, "model");
-    glUniformMatrix4fv(modelloc, 1, GL_FALSE, glm::value_ptr(model));
-}
-
-
 // close window on ESC key press
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -46,7 +12,11 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 int main() {
-    glfwInit();
+    if (!glfwInit()) {
+        // initialization failed
+        std::cerr << "Failed to initialize GLFW" << std::endl;
+        return -1;
+    }
 
     // create a windowed mode window
     GLFWwindow* window = glfwCreateWindow(600, 400, "OpenGL Window", NULL, NULL);
@@ -56,24 +26,84 @@ int main() {
         glfwTerminate();
         return -1;
     }
-
     // to use the OpenGL API
     glfwMakeContextCurrent(window);
-    // use an exteension loader library
+
+    // use an extension loader library
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    while (!glfwWindowShouldClose(window)) {
-        // keep running
-        glClear(GL_COLOR_BUFFER_BIT);
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+    printf("Renderer: %s.\n", glGetString(GL_RENDERER));
+    printf("OpenGL version supported %s.\n", glGetString(GL_VERSION));
 
-        // set the key callback
+    // Define a triangle in a vertex buffer
+    float points[] = {
+        0.0f,  0.5f, 0.0f,  // Vertex 1 (X, Y)
+        0.5f, -0.5f, 0.0f,  // Vertex 2 (X, Y)
+        -0.5f, -0.5f, 0.0f   // Vertex 3 (X, Y)
+    };
+
+    GLuint vbo = 0;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(float), points, GL_STATIC_DRAW);
+
+    GLuint vao = 0;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+    // Shaders
+    const char* vertex_shader =
+        "#version 330 core\n"
+        "in vec3 vp;"
+        "void main() {"
+        "  gl_Position = vec4(vp, 1.0);"
+        "}";
+
+    const char* fragment_shader =
+        "#version 330 core\n"
+        "out vec4 frag_color;"
+        "void main() {"
+        "  frag_color = vec4(0.6, 0.5, 0.7, 1.0);"
+        "}";
+
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &vertex_shader, NULL);
+    glCompileShader(vs);
+
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &fragment_shader, NULL);
+    glCompileShader(fs);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, fs);
+    glAttachShader(shader_program, vs);
+    glLinkProgram(shader_program);
+
+    // main loop
+    while (!glfwWindowShouldClose(window)) {
+        // update window events
+        glfwPollEvents();
+        // wipe the drawing surface clear
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // put the shader program, and the VAO, in focus in openGL's state machine
+        glUseProgram(shader_program);
+        glBindVertexArray(vao);
+
+        // draw points 0-3 from the currently bound VAO with current in-use shader
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        // put the stuff we've been drawing onto the visible area
+        glfwSwapBuffers(window);
+
         glfwSetKeyCallback(window, key_callback);
 
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        glViewport(0, 0, width, height);
+        // int width, height;
+        // glfwGetFramebufferSize(window, &width, &height);
+        // glViewport(0, 0, width, height);
     }
 
     glfwDestroyWindow(window);

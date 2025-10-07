@@ -1,3 +1,5 @@
+.vscode/
+
 # the build output .exe file
 /bin/main.exe
 

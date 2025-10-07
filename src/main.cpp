@@ -71,19 +71,29 @@ int main() {
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 
-    // Shaders
+    // position
     const char* vertex_shader =
         "#version 330 core\n"
-        "in vec3 vp;"
+        "in vec3 vertex_position;"
+        "uniform float time;"
+        "out vec3 pos;"
         "void main() {"
-        "  gl_Position = vec4(vp, 1.0);"
+        "  pos = vertex_position;"
+        "  pos.y += sin(time);"
+        "  gl_Position = vec4(pos, 1.0);"
         "}";
-
+    
+    // color
     const char* fragment_shader =
         "#version 330 core\n"
+        "in vec3 pos;"
+        "uniform float time;"
         "out vec4 frag_color;"
         "void main() {"
-        "  frag_color = vec4(0.6, 0.5, 0.7, 1.0);"
+        // "  float wild = sin(time) * 0.5 + 0.5;"
+        // "  frag_color.rba = vec3(1.0);"
+        // "  frag_color.g = wild;"
+        "  frag_color = vec4(pos, 1.0);"
         "}";
 
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
@@ -92,7 +102,6 @@ int main() {
     // shader error logs
     int params = -1;
     glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
-    std::cout << params << std::endl;
     if (GL_TRUE != params) {
         int max_length = 2048, actual_length = 0;
         char slog[2048];
@@ -135,8 +144,8 @@ int main() {
 
     // main loop
     while (!glfwWindowShouldClose(window)) {
-
-        double current_seconds = glfwGetTime();
+        // calculate fps
+        double current_seconds = glfwGetTime(); // get the current time
         double elapsed_seconds = current_seconds - previous_seconds;
         previous_seconds = current_seconds;
 
@@ -151,15 +160,18 @@ int main() {
             title_countdown_seconds = 0.1;
         }
 
+        // get the time uniform location
+        current_seconds = glfwGetTime();
+        int time_location = glGetUniformLocation(shader_program, "time");
+
         // update window events
         glfwPollEvents();
         // wipe the drawing surface clear
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         // put the shader program, and the VAO, in focus in openGL's state machine
         glUseProgram(shader_program);
+        glUniform1f(time_location, (float)current_seconds);
         glBindVertexArray(vao);
-
         // draw points 0-3 from the currently bound VAO with current in-use shader
         glDrawArrays(GL_TRIANGLES, 0, 3);
 

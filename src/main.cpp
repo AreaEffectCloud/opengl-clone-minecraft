@@ -5,9 +5,9 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-// #include <glm/glm.hpp>
-// #include <glm/gtc/matrix_transform.hpp>
-// #include <glm/gtx/transform.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 // close window on ESC key press
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -132,7 +132,6 @@ int main() {
     int win_width = 800, win_height = 600;
     GLFWmonitor* monitor = NULL;
     set_full_screen(full_screen, monitor, win_width, win_height);
-
     // create a windowed mode window
     GLFWwindow* window = glfwCreateWindow(win_width, win_height, "OpenGL Window", monitor, NULL);
     if (!window) {
@@ -189,6 +188,31 @@ int main() {
         return -1;
     }
 
+    // Projection Matrix
+    glm::mat4 projection= glm::perspective(
+        glm::radians(45.0f),                  // FOV
+        (float)win_width / (float)win_height, // Aspect Ratio
+        0.1f,                                 // Near clipping
+        100.0f                                // Far clipping
+    );
+    // View Matrix
+    glm::mat4 view = glm::lookAt(
+        glm::vec3(4.0f, 3.0f, 3.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+    // Model Matrix
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(1.0f, 1.0f, 1.0f));
+
+    // Get the uniform locations
+    GLuint model_loc = glGetUniformLocation(shader_program, "model");
+    GLuint view_loc = glGetUniformLocation(shader_program, "view");
+    GLuint proj_loc = glGetUniformLocation(shader_program, "projection");
+    if (model_loc == -1 || view_loc == -1 || proj_loc == -1) {
+        std::cerr << "WARNING: Uniform 'model', 'view' and 'projection' not found in shader." << std::endl;
+    }
+
     // Frame Rate Counter
     double previous_seconds = glfwGetTime();
     double title_countdown_seconds= 0.1;
@@ -209,9 +233,12 @@ int main() {
         
         // put the shader program, and the VAO, in focus in openGL's state machine
         glUseProgram(shader_program);
-        if (time_location != -1) {
-            glUniform1f(time_location, (float)current_seconds);
-        }
+
+        // submit the matrix
+        glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(projection));
+
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 

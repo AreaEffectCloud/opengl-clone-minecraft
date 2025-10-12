@@ -1,4 +1,4 @@
-#include "camera.h"
+#include "include/camera.h"
 #include <cmath>
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
@@ -26,6 +26,10 @@ void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
         Position -= Right * velocity;
     if (direction == RIGHT)
         Position += Right * velocity;
+    if (direction == UP)
+        Position += WorldUp * velocity;
+    if (direction == DOWN)
+        Position -= WorldUp * velocity;
     
     // (オプション) 地面の上を移動させたい場合は、Position.y = 0.0f; などでY座標を固定する
 }

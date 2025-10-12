@@ -1,4 +1,4 @@
-#include "Shader.h"
+#include "include/shader.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -36,26 +36,26 @@ Shader::Shader(const char* vertex_shader_path, const char* fragment_shader_path)
 
     unsigned int vertex, fragment;
     
-    // 頂点シェーダー
+    // vertex shader
     vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vertex_shader_code, NULL);
     glCompileShader(vertex);
     checkCompileErrors(vertex, "VERTEX");
 
-    // フラグメントシェーダー
+    // fragment shader
     fragment = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment, 1, &fragment_shader_code, NULL);
     glCompileShader(fragment);
     checkCompileErrors(fragment, "FRAGMENT");
 
-    // 2. シェーダープログラムのリンク
+    // 2. link shader programs
     ID = glCreateProgram();
     glAttachShader(ID, vertex);
     glAttachShader(ID, fragment);
     glLinkProgram(ID);
     checkCompileErrors(ID, "PROGRAM");
 
-    // 3. 終了したらシェーダーオブジェクトを削除
+    // 3. delete shader object
     glDeleteShader(vertex);
     glDeleteShader(fragment);
 }
@@ -68,6 +68,11 @@ void Shader::use()
 void Shader::setMat4(const std::string& name, const glm::mat4& mat) const
 {
     glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+}
+
+void Shader::setInt(const std::string& name, int value) const
+{
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
 }
 
 // エラーチェックの実装

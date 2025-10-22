@@ -26,9 +26,9 @@ void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
         Position -= Right * velocity;
     if (direction == RIGHT)
         Position += Right * velocity;
-    if (direction == UP)
+    if (direction == TOP)
         Position += WorldUp * velocity;
-    if (direction == DOWN)
+    if (direction == BOTTOM)
         Position -= WorldUp * velocity;
     
     // (オプション) 地面の上を移動させたい場合は、Position.y = 0.0f; などでY座標を固定する

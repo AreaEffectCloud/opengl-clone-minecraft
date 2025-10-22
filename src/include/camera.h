@@ -10,8 +10,8 @@ enum Camera_Movement {
     BACKWARD,
     LEFT,
     RIGHT,
-    UP,
-    DOWN
+    TOP,
+    BOTTOM
 };
 
 const float YAW = -90.0f; // ヨー (左右の回転)
@@ -44,6 +44,6 @@ class Camera {
 
     private:
         void updateCameraVectors();
-    };
+};
 
 #endif

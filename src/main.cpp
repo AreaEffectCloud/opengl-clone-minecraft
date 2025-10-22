@@ -14,9 +14,8 @@
 
 #include "include/shader.h"
 #include "include/camera.h"
-
-const int WORLD_SIZE = 16;
-int world[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
+#include "include/world.h"
+#include "include/meshbuilder.h"
 
 int SCR_WIDTH = 800, SCR_HEIGHT = 600;
 const char* vertex_shader_source = "./../src/assets/shader/vertex_shader.glsl";
@@ -62,55 +61,12 @@ int main() {
     // use an extension loader library
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    // define only 8 vertixes
-    float vertices[] = {
-        // positions          // colors           // texture coordinates
-        // 1. front (+Z) (頂点 0-3)
-        -0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f, // 0: 左下
-         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,   1.0f, 1.0f, // 1: 右下
-         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 1.0f,   1.0f, 0.0f, // 2: 右上
-        -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 1.0f,   0.0f, 0.0f, // 3: 左上
+    World world;
+    MeshData mesh = MeshBuilder::build(world);
 
-        // 2. back (-Z) (頂点 4-7)
-         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,   0.0f, 1.0f, // 4: 右下
-        -0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 0.0f,   1.0f, 1.0f, // 5: 左下
-        -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f, // 6: 左上
-         0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,   0.0f, 0.0f, // 7: 右上
-        
-        // 3. left (-X) (頂点 8-11)
-        -0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 0.0f,   0.0f, 1.0f, // 8: 下奥
-        -0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   1.0f, 1.0f, // 9: 下前
-        -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 1.0f,   1.0f, 0.0f, // 10: 上前
-        -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // 11: 上奥
-
-        // 4. right (+X) (頂点 12-15)
-         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,   0.0f, 1.0f, // 12: 下前
-         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f, // 13: 下奥
-         0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f, // 14: 上奥
-         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 1.0f,   0.0f, 0.0f, // 15: 上前
-
-        // 5. bottom (-Y) (頂点 16-19)
-        -0.5f, -0.5f, -0.5f,   0.0f, 0.0f, 0.0f,   0.0f, 1.0f, // 16: 左奥
-         0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f, // 17: 右奥
-         0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f,   1.0f, 0.0f, // 18: 右前
-        -0.5f, -0.5f,  0.5f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f, // 19: 左前
-
-        // 6. top (+Y) (頂点 20-23)
-        -0.5f,  0.5f,  0.5f,   0.0f, 1.0f, 1.0f,   0.0f, 1.0f, // 20: 左前
-         0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 1.0f,   1.0f, 1.0f, // 21: 右前
-         0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f,   1.0f, 0.0f, // 22: 右奥
-        -0.5f,  0.5f, -0.5f,   0.0f, 1.0f, 0.0f,   0.0f, 0.0f  // 23: 左奥
-    };
-
-    // element buffer object
-    unsigned int indices[] = {
-        0, 1, 2,     2, 3, 0,     // front
-        4, 5, 6,     6, 7, 4,     // back
-        8, 9, 10,    10, 11, 8,   // left
-        12, 13, 14,  14, 15, 12,  // right
-        16, 17, 18,  18, 19, 16,  // bottom
-        20, 21, 22,  22, 23, 20   // top
-    };
+    const float* vertices = mesh.vertices.data();
+    const unsigned int* indices = mesh.indices.data();
+    unsigned int totalIndicesCount = mesh.indices.size();
 
     const size_t VERTEX_ARRAY_SIZE = sizeof(vertices) / sizeof(vertices[0]);
     const int NUM_VERTICES = VERTEX_ARRAY_SIZE / 6;
@@ -122,9 +78,9 @@ int main() {
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(float), vertices, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int), indices, GL_STATIC_DRAW);
  
     // pos: layout 0
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
@@ -192,7 +148,7 @@ int main() {
 
         // drawing
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, totalIndicesCount, GL_UNSIGNED_INT, 0);
         
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -238,9 +194,9 @@ static void key_callback(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        camera.ProcessKeyboard(UP, deltaTime);
+        camera.ProcessKeyboard(TOP, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        camera.ProcessKeyboard(DOWN, deltaTime);
+        camera.ProcessKeyboard(BOTTOM, deltaTime);
 }
 
 static void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {

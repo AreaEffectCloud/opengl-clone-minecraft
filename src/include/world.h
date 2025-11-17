@@ -1,39 +1,32 @@
 #ifndef WORLD_H
 #define WORLD_H
 
-#include "block.h"
-#include <iostream>
+#include "types.h"
+#include "chunk.h"
+#include "worldgen.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-const int CHUNK_SIZE_X = 16;
-const int CHUNK_SIZE_Y = 2;
-const int CHUNK_SIZE_Z = 16;
+struct World {
+    size_t chunks_size;
+    struct Chunk** chunks;
+    ivec3s chunks_origin;
+    ivec3s center_offset;
+    u64 seed; 
 
-class World {
-    public:
-        BlockType data[CHUNK_SIZE_X][CHUNK_SIZE_Y][CHUNK_SIZE_Z];
-
-        World() {
-            generateSimpleTerrain();
-        }
-
-        BlockType getBlock(int x, int y, int z) const {
-            if (x < 0 || x >= CHUNK_SIZE_X || 
-                y < 0 || y >= CHUNK_SIZE_Y || 
-                z < 0 || z >= CHUNK_SIZE_Z) {
-                return BlockType::AIR; // Out of bounds
-            }
-            return data[x][y][z];
-        }
-
-    private:
-        void generateSimpleTerrain() {
-            for (int x = 0; x < CHUNK_SIZE_X; ++x) {
-                for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
-                    data[x][0][z] = BlockType::STONE;
-                    data[x][1][z] = BlockType::DIRT;
-                }
-            }
-        }
+    struct Heightmap** heightmaps;
 };
+
+void world_init(struct World* world, u64 seed, size_t chunks_size);
+void world_destroy(struct World* world);
+
+struct Chunk* world_create_chunk(struct World* world, ivec3s offset);
+void world_destroy_chunk(struct World* world, ivec3s offset);
+struct Chunk* world_get_chunk(struct World* world, ivec3s offset);
+size_t world_chunk_index(const struct World* world, ivec3s offset);
+
+ivec3s world_blockpos_to_chunk_offset(ivec3s pos);
+ivec3s world_blockpos_to_chunk_local(ivec3s pos);
 
 #endif // WORLD_H

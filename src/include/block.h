@@ -1,17 +1,30 @@
 #ifndef BLOCK_H
 #define BLOCK_H
 
-#include <glm/glm.hpp>
+#include "types.h"
+typedef u16 BlockId;
 
-enum class BlockType {
+enum BlockIds {
     AIR = 0,
     STONE = 1,
     DIRT = 2,
-    GRASS = 3
+    GRASS = 3,
+    WATER = 4,
+    SAND = 5
 };
 
-// texture
+struct BlockType {
+    BlockId id;
+    const char* name;
+    bool transparent; // 面を省略する際に参照
+    bool is_liquid;
+    int texture_index; // テクスチャアトラス内のインデックス
+};
 
-// directly define texture UV in mesh builder
+extern const struct BlockType BLOCK_TYPES[];
+
+static inline bool block_is_transparent(BlockId id) {
+    return BLOCK_TYPES[id].transparent;
+}
 
 #endif

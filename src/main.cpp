@@ -5,6 +5,7 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -15,36 +16,47 @@
 #include "include/shader.h"
 #include "include/camera.h"
 #include "include/world.h"
-#include "include/meshbuilder.h"
+#include "include/chunk.h"
+#include "include/chunkmesh.h"
 
-int SCR_WIDTH = 800, SCR_HEIGHT = 600;
+static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
 const char* vertex_shader_source = "./../src/assets/shader/vertex_shader.glsl";
 const char* fragment_shader_source = "./../src/assets/shader/fragment_shader.glsl";
 
-Camera camera(glm::vec3(0.0f, 1.0f, 3.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
+static Camera camera(glm::vec3(5.0f, 20.0f, 40.0f));
+static float lastX = (float)SCR_WIDTH / 2.0f;
+static float lastY = (float)SCR_HEIGHT / 2.0f;
+static bool firstMouse = true;
 
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
+static float deltaTime = 0.0f;
+static float lastFrame = 0.0f;
 
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-static void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WIDTH, int &SCR_HEIGHT);
-static void key_callback(GLFWwindow* window);
+// static void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WIDTH, int &SCR_HEIGHT);
 static void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+static void key_callback(GLFWwindow* window);
 
 int main() {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
     }
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    #ifdef __APPLE__
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for MacOS
+    #endif
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
     // full screen
-    bool full_screen = false;
-    GLFWmonitor* monitor = NULL;
-    set_full_screen(full_screen, monitor, SCR_WIDTH, SCR_HEIGHT);
+    // bool full_screen = false;
+    // GLFWmonitor* monitor = NULL;
+    // set_full_screen(full_screen, monitor, SCR_WIDTH, SCR_HEIGHT);
+
     // create a windowed mode window
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", monitor, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", NULL, NULL);
     if (!window) {
         // window or context creation failed
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -54,119 +66,93 @@ int main() {
     // to use the OpenGL API
     glfwMakeContextCurrent(window);
 
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetCursorPosCallback(window, mouse_callback);
-
     // use an extension loader library
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    World world;
-    MeshData mesh = MeshBuilder::build(world);
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
 
-    const float* vertices = mesh.vertices.data();
-    const unsigned int* indices = mesh.indices.data();
-    unsigned int totalIndicesCount = mesh.indices.size();
-
-    const size_t VERTEX_ARRAY_SIZE = sizeof(vertices) / sizeof(vertices[0]);
-    const int NUM_VERTICES = VERTEX_ARRAY_SIZE / 6;
-
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(float), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int), indices, GL_STATIC_DRAW);
- 
-    // pos: layout 0
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // color: layout 1 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // texture coor: layout 2
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glBindVertexArray(0);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glEnable(GL_DEPTH_TEST);
 
     Shader ourShader(vertex_shader_source, fragment_shader_source);
 
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    int width, height, nrChannels;
-    unsigned char* data = stbi_load("./../src/assets/block/cobblestone.png", &width, &height, &nrChannels, 0);
-    if (data) {
-        GLenum format = GL_RGB;
-        if (nrChannels == 4) format = GL_RGBA;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
-        std::cerr << "Failed to load texture" << std::endl;
+    struct World world;
+    world_init(&world, (u64)123456789ULL, 4);
+    ivec3s center = { 0, 0, 0 };
+    struct Chunk* center_chunk = world_create_chunk(&world, center);
+    if (!center_chunk) {
+        std::cerr << "Failed to create center chunk" << std::endl;
     }
-    stbi_image_free(data);
+
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    
+    // int width, height, nrChannels;
+    // unsigned char* data = stbi_load("./../src/assets/block/cobblestone.png", &width, &height, &nrChannels, 0);
+    // if (data) {
+    //     GLenum format = GL_RGB;
+    //     if (nrChannels == 4) format = GL_RGBA;
+    //     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    //     glGenerateMipmap(GL_TEXTURE_2D);
+    // } else {
+    //     std::cerr << "Failed to load texture" << std::endl;
+    // }
+    // stbi_image_free(data);
 
     ourShader.use();
     ourShader.setInt("our_texture", 0);
 
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK); // culling back side
-    glFrontFace(GL_CCW); // define front side as counter clockwise
+    // glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK); // culling back side
+    // glFrontFace(GL_CCW); // define front side as counter clockwise
 
     // main loop
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        key_callback(window);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        key_callback(window);
+        glfwPollEvents();
+
+        glClearColor(0.35f, 0.55f, 0.85f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         ourShader.use();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
 
-        // mvp
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        ourShader.setMat4("projection", projection);
         glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("view", view);
-        glm::mat4 model = glm::mat4(1.0f);
-        ourShader.setMat4("model", model);
+        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
 
-        // drawing
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, totalIndicesCount, GL_UNSIGNED_INT, 0);
-        
+        size_t total = world.chunks_size * world.chunks_size;
+        for (size_t i = 0; i < total; ++i) {
+            struct Chunk* chunk = world.chunks[i];
+            if (!chunk || !chunk->mesh->uploaded) continue;
+            
+            glm::mat4 model = glm::mat4(1.0f);
+            // もし mesh がチャンクローカル座標で作られているなら translate を入れる:
+            // model = glm::translate(model, glm::vec3((float)chunk->position.x, (float)chunk->position.y, (float)chunk->position.z));
+            glm::mat4 mvp = projection * view * model;
+            ourShader.setMat4("uMVP", mvp);
+
+            chunkmesh_render(chunk->mesh, CHUNK_MESH_OPAQUE);
+        }
         glfwSwapBuffers(window);
-        glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-    glDeleteTextures(1, &texture);
+    world_destroy(&world);
+    glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
 }
 
-static void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-static void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WIDTH, int &SCR_HEIGHT) {
+void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WIDTH, int &SCR_HEIGHT) {
     if (full_screen) {
         monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
@@ -181,9 +167,9 @@ static void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WID
     }
 }
 
-static void key_callback(GLFWwindow* window) {
+void key_callback(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+        glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
@@ -199,7 +185,7 @@ static void key_callback(GLFWwindow* window) {
         camera.ProcessKeyboard(BOTTOM, deltaTime);
 }
 
-static void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
@@ -215,4 +201,12 @@ static void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     lastY = ypos;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    camera.Zoom -= (float)yoffset;
+    if (camera.Zoom < 1.0f)
+        camera.Zoom = 1.0f;
+    if (camera.Zoom > 45.0f)
+        camera.Zoom = 45.0f;
 }

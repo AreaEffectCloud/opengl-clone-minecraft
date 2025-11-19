@@ -13,17 +13,17 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-#include "include/shader.h"
-#include "include/camera.h"
-#include "include/world.h"
-#include "include/chunk.h"
-#include "include/chunkmesh.h"
+// #include "include/shader.h"
+// #include "include/camera.h"
+// #include "include/world.h"
+// #include "include/chunk.h"
+// #include "include/chunkmesh.h"
 
 static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
 const char* vertex_shader_source = "./../src/assets/shader/vertex_shader.glsl";
 const char* fragment_shader_source = "./../src/assets/shader/fragment_shader.glsl";
 
-static Camera camera(glm::vec3(5.0f, 20.0f, 40.0f));
+// static Camera camera(glm::vec3(5.0f, 20.0f, 40.0f));
 static float lastX = (float)SCR_WIDTH / 2.0f;
 static float lastY = (float)SCR_HEIGHT / 2.0f;
 static bool firstMouse = true;
@@ -77,15 +77,15 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glEnable(GL_DEPTH_TEST);
 
-    Shader ourShader(vertex_shader_source, fragment_shader_source);
+    // Shader ourShader(vertex_shader_source, fragment_shader_source);
 
-    struct World world;
-    world_init(&world, (u64)123456789ULL, 4);
-    ivec3s center = { 0, 0, 0 };
-    struct Chunk* center_chunk = world_create_chunk(&world, center);
-    if (!center_chunk) {
-        std::cerr << "Failed to create center chunk" << std::endl;
-    }
+    // struct World world;
+    // world_init(&world, (u64)123456789ULL, 4);
+    // ivec3s center = { 0, 0, 0 };
+    // struct Chunk* center_chunk = world_create_chunk(&world, center);
+    // if (!center_chunk) {
+    //     std::cerr << "Failed to create center chunk" << std::endl;
+    // }
 
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     
@@ -101,8 +101,8 @@ int main() {
     // }
     // stbi_image_free(data);
 
-    ourShader.use();
-    ourShader.setInt("our_texture", 0);
+    // ourShader.use();
+    // ourShader.setInt("our_texture", 0);
 
     // glEnable(GL_DEPTH_TEST);
     // glEnable(GL_CULL_FACE);
@@ -121,92 +121,29 @@ int main() {
         glClearColor(0.35f, 0.55f, 0.85f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        ourShader.use();
+    //     ourShader.use();
 
-        glm::mat4 view = camera.GetViewMatrix();
-        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+    //     glm::mat4 view = camera.GetViewMatrix();
+    //     projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
 
-        size_t total = world.chunks_size * world.chunks_size;
-        for (size_t i = 0; i < total; ++i) {
-            struct Chunk* chunk = world.chunks[i];
-            if (!chunk || !chunk->mesh->uploaded) continue;
+    //     size_t total = world.chunks_size * world.chunks_size;
+    //     for (size_t i = 0; i < total; ++i) {
+    //         struct Chunk* chunk = world.chunks[i];
+    //         if (!chunk || !chunk->mesh->uploaded) continue;
             
-            glm::mat4 model = glm::mat4(1.0f);
-            // もし mesh がチャンクローカル座標で作られているなら translate を入れる:
-            // model = glm::translate(model, glm::vec3((float)chunk->position.x, (float)chunk->position.y, (float)chunk->position.z));
-            glm::mat4 mvp = projection * view * model;
-            ourShader.setMat4("uMVP", mvp);
+    //         glm::mat4 model = glm::mat4(1.0f);
+    //         // もし mesh がチャンクローカル座標で作られているなら translate を入れる:
+    //         // model = glm::translate(model, glm::vec3((float)chunk->position.x, (float)chunk->position.y, (float)chunk->position.z));
+    //         glm::mat4 mvp = projection * view * model;
+    //         ourShader.setMat4("uMVP", mvp);
 
-            chunkmesh_render(chunk->mesh, CHUNK_MESH_OPAQUE);
-        }
-        glfwSwapBuffers(window);
+    //         chunkmesh_render(chunk->mesh, CHUNK_MESH_OPAQUE);
+    //     }
+    //     glfwSwapBuffers(window);
     }
 
-    world_destroy(&world);
+    // world_destroy(&world);
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
-}
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
-}
-
-void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WIDTH, int &SCR_HEIGHT) {
-    if (full_screen) {
-        monitor = glfwGetPrimaryMonitor();
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        
-        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-        
-        SCR_WIDTH = mode->width;
-        SCR_HEIGHT = mode->height;
-    }
-}
-
-void key_callback(GLFWwindow* window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        camera.ProcessKeyboard(TOP, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        camera.ProcessKeyboard(BOTTOM, deltaTime);
-}
-
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
-
-    if (firstMouse) {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // y軸は下が正のため反転
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
-}
-
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    camera.Zoom -= (float)yoffset;
-    if (camera.Zoom < 1.0f)
-        camera.Zoom = 1.0f;
-    if (camera.Zoom > 45.0f)
-        camera.Zoom = 45.0f;
 }

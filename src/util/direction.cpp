@@ -1,4 +1,4 @@
-#include "include/direction.h"
+#include "direction.h"
 #include <string.h>
 #include <assert.h>
 

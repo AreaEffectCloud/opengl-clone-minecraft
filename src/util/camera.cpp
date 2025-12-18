@@ -1,22 +1,27 @@
-#include "camera.h"
+#include "camera.hpp"
+#include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
+    : Position(position), 
+    Front(glm::vec3(0.0f, 0.0f, -1.0f)), 
+    Up(glm::vec3(0.0f, 1.0f, 0.0f)), 
+    Right(glm::vec3(1.0f, 0.0f, 0.0f)), 
+    WorldUp(up),
+    Yaw(yaw),
+    Pitch(pitch),
+    MovementSpeed(CAMERA_SPEED), 
+    MouseSensitivity(CAMERA_SENSITIVITY), 
+    Zoom(CAMERA_ZOOM)
 {
-    Position = position;
-    WorldUp = up;
-    Yaw = yaw;
-    Pitch = pitch;
     updateCameraVectors();
 }
 
-glm::mat4 Camera::GetViewMatrix() {
+glm::mat4 Camera::GetViewMatrix() const {
     return glm::lookAt(Position, Position + Front, Up);
 }
 
-void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
-{
+void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime) {
     float velocity = MovementSpeed * deltaTime;
     if (direction == FORWARD)
         Position += Front * velocity;
@@ -30,40 +35,39 @@ void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
         Position += WorldUp * velocity;
     if (direction == BOTTOM)
         Position -= WorldUp * velocity;
-    
-    // (オプション) 地面の上を移動させたい場合は、Position.y = 0.0f; などでY座標を固定する
 }
 
-void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch)
-{
+void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch) {
     xoffset *= MouseSensitivity;
     yoffset *= MouseSensitivity;
     Yaw   += xoffset;
     Pitch += yoffset;
 
     // ピッチ（上下の回転）を制限し、カメラがひっくり返るのを防ぐ
-    if (constrainPitch)
-    {
-        if (Pitch > 89.0f)
-            Pitch = 89.0f;
-        if (Pitch < -89.0f)
-            Pitch = -89.0f;
+    if (constrainPitch) {
+        if (Pitch > 89.0f) Pitch = 89.0f;
+        if (Pitch < -89.0f) Pitch = -89.0f;
     }
-
     updateCameraVectors();
 }
 
-void Camera::updateCameraVectors()
-{
+void Camera::ProcessMouseScroll(float yoffset) {
+    // Zoom は FOV（度）として扱う。適当な範囲にクランプする
+    Zoom -= yoffset;
+    if (Zoom < 1.0f) Zoom = 1.0f;
+    if (Zoom > 90.0f) Zoom = 90.0f;
+}
+
+void Camera::updateCameraVectors() {
     glm::vec3 front;
     float yawRad = glm::radians(Yaw);
     float pitchRad = glm::radians(Pitch);
 
-    front.x = cos(yawRad) * cos(pitchRad);
-    front.y = sin(pitchRad);
-    front.z = sin(yawRad) * cos(pitchRad);
+    front.x = std::cos(yawRad) * std::cos(pitchRad);
+    front.y = std::sin(pitchRad);
+    front.z = std::sin(yawRad) * std::cos(pitchRad);
+    Front = glm::normalize(front);
     
-    Front = glm::normalize(front);    
     Right = glm::normalize(glm::cross(Front, WorldUp));
     Up    = glm::normalize(glm::cross(Right, Front));
 }

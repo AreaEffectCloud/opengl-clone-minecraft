@@ -1,43 +1,24 @@
 #include "cube_renderer.hpp"
 #include "cube_mesh.hpp"
+#include "shader_utils.hpp"
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <iostream>
+#include <windows.h>
 
-static const char* kVertexSource = R"glsl(
-#version 330 core
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec3 aNormal;
-layout(location = 2) in vec2 aTex;
-layout(location = 3) in vec3 aInstancePos;
+std::string vertex_shader_path = "../src/assets/shader/vertex_shader.glsl";
+std::string fragment_shader_path = "../src/assets/shader/fragment_shader.glsl";
 
-uniform mat4 uViewProj;
+std::string vertex_shader_source = loadShaderSourceFromFile(vertex_shader_path);
+std::string fragment_shader_source = loadShaderSourceFromFile(fragment_shader_path);
 
-out vec3 vNormal;
-out vec2 vTex;
-
-void main() {
-    // translate cube by instance position (assume instance pos is world coords)
-    vec3 p = aPos + aInstancePos;
-    gl_Position = uViewProj * vec4(p, 1.0);
-    vNormal = aNormal;
-    vTex = aTex;
+void checkOpenGLError(const char* tag) {
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        std::fprintf(stderr, "[ERROR][%s] OpenGL Error: %u\n", tag, err);
+    }
 }
-)glsl";
-
-static const char* kFragmentSource = R"glsl(
-#version 330 core
-in vec3 vNormal;
-in vec2 vTex;
-out vec4 FragColor;
-void main() {
-    // simple lambert-like shading with constant light dir
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-    float diff = max(dot(normalize(vNormal), lightDir), 0.1);
-    vec3 base = vec3(0.8, 0.7, 0.5); // color (can be replaced per-block by texture)
-    FragColor = vec4(base * diff, 1.0);
-}
-)glsl";
 
 namespace gfx {
 
@@ -70,6 +51,12 @@ namespace gfx {
         GLuint program = glCreateProgram();
         glAttachShader(program, vertex_shader);
         glAttachShader(program, fragment_shader);
+
+        glBindAttribLocation(program, 0, "aPos");
+        glBindAttribLocation(program, 1, "aNormal");
+        glBindAttribLocation(program, 2, "aTex");
+        glBindAttribLocation(program, 3, "aInstancePos");
+
         glLinkProgram(program);
 
         GLint success = 0;
@@ -86,32 +73,47 @@ namespace gfx {
 
     bool CubeRenderer::init() {
         m_cube_mesh = new CubeMesh();
+        if (vertex_shader_source.empty() || fragment_shader_source.empty()) {
+            std::fprintf(stderr, "Failed to load shader sources: %s, %s\n", vertex_shader_path.c_str(), fragment_shader_path.c_str());
+            return false;
+        }
 
         // compile shaders
-        GLuint vertex_shader = compile_shader(kVertexSource, GL_VERTEX_SHADER);
+        GLuint vertex_shader = compile_shader(vertex_shader_source.c_str(), GL_VERTEX_SHADER);
         if (!vertex_shader) return false;
-        GLuint fragment_shader = compile_shader(kFragmentSource, GL_FRAGMENT_SHADER);
+        GLuint fragment_shader = compile_shader(fragment_shader_source.c_str(), GL_FRAGMENT_SHADER);
         if (!fragment_shader) {
             glDeleteShader(vertex_shader);
             return false;
         }
+
+        // link program
         m_program = link_program(vertex_shader, fragment_shader);
         glDeleteShader(vertex_shader);
         glDeleteShader(fragment_shader);
         if (!m_program) return false;
 
         // create instance VBO
+        std::printf("[CubeRenderer] Creating instance VBO...\n");
         glGenBuffers(1, &m_instance_vbo);
+        std::printf("[CubeRenderer] Generated instance VBO: ID=%u\n", (unsigned int)m_instance_vbo);
+        std::printf("[CubeRenderer] Finished creating instance VBO...\n");
 
         // bind cube VAO and enable instanced attrib
+        std::printf("[CubeRenderer] Binding VAO...\n");
         glBindVertexArray(m_cube_mesh->vao());
+        std::printf("[CubeRenderer] Finished binding VAO...\n");
+
         glBindBuffer(GL_ARRAY_BUFFER, m_instance_vbo);
+        checkOpenGLError("After glBindBuffer for instance VBO");
 
         glEnableVertexAttribArray(3); // aInstancePos
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glVertexAttribDivisor(3, 1); // advance per instance
+        // glVertexAttribDivisor(3, 1); // advance per instance
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
+
+        printf("[CubeRenderer] initialized: program=%u, cube_vao=%u\n", (unsigned)m_program, (unsigned)m_cube_mesh->vao());
 
         return true;
     }
@@ -130,12 +132,21 @@ namespace gfx {
 
     void CubeRenderer::draw(const float* viewProj4x4) {
         if (!m_program || !m_cube_mesh) return;
+
         glUseProgram(m_program);
+        checkOpenGLError("After glUseProgram");
+
         GLint loc = glGetUniformLocation(m_program, "uViewProj");
         if (loc >= 0) glUniformMatrix4fv((GLint)loc, 1, GL_FALSE, viewProj4x4);
-        
+                
         glBindVertexArray(m_cube_mesh->vao());
-        glDrawArraysInstanced(GL_TRIANGLES, 0, m_cube_mesh->vertex_count(), m_instance_count);
+        checkOpenGLError("After glBindVertexArray");
+
+        // glDrawArraysInstanced(GL_TRIANGLES, 0, m_cube_mesh->vertex_count(), m_instance_count);
+        glDrawArrays(GL_TRIANGLES, 0, m_cube_mesh->vertex_count() * m_instance_count);
+        checkOpenGLError("After glDrawArrays");
+        // std::printf("[CubeRenderer] glDrawArrays completed\n");
+
         glBindVertexArray(0);
         glUseProgram(0);
     }

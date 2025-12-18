@@ -13,12 +13,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-// #include "include/shader.h"
-// #include "include/camera.h"
-// #include "include/world.h"
-// #include "include/chunk.h"
-// #include "include/chunkmesh.h"
-
 static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
 const char* vertex_shader_source = "./../src/assets/shader/vertex_shader.glsl";
 const char* fragment_shader_source = "./../src/assets/shader/fragment_shader.glsl";
@@ -75,7 +69,7 @@ int main() {
     glfwSetScrollCallback(window, scroll_callback);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_DEPTH_TEST);
 
     // Shader ourShader(vertex_shader_source, fragment_shader_source);
 
@@ -104,10 +98,10 @@ int main() {
     // ourShader.use();
     // ourShader.setInt("our_texture", 0);
 
-    // glEnable(GL_DEPTH_TEST);
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK); // culling back side
-    // glFrontFace(GL_CCW); // define front side as counter clockwise
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK); // culling back side
+    glFrontFace(GL_CCW); // define front side as counter clockwise
 
     // main loop
     while (!glfwWindowShouldClose(window)) {

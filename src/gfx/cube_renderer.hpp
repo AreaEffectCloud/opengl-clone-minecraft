@@ -21,11 +21,11 @@ namespace gfx {
 
             GLuint program() const noexcept { return m_program; }
 
-        private:
+            private:
             GLuint m_program = 0;
             GLuint m_instance_vbo = 0;
-            gfx::CubeMesh* m_cube_mesh = nullptr;
             GLuint m_instance_count = 0;
+            gfx::CubeMesh* m_cube_mesh = nullptr;
 
             GLuint compile_shader(const char* source, GLenum shader_type);
             GLuint link_program(GLuint vertex_shader, GLuint fragment_shader);

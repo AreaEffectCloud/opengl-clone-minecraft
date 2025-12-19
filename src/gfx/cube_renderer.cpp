@@ -7,12 +7,28 @@
 #include <iostream>
 #include <windows.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 std::string vertex_shader_path = "../src/assets/shader/vertex_shader.glsl";
 std::string fragment_shader_path = "../src/assets/shader/fragment_shader.glsl";
-
 std::string vertex_shader_source = loadShaderSourceFromFile(vertex_shader_path);
 std::string fragment_shader_source = loadShaderSourceFromFile(fragment_shader_path);
 
+// const char* vertex_shader_source = "../src/assets/shader/vertex_shader.glsl";
+// const char* fragment_shader_source = "../src/assets/shader/fragment_shader.glsl";
+
+// Texture Atlas
+const char* texture_path = "../src/assets/textures/texture_atlas.png";
+
+struct GLContext {
+    GLuint programID;
+    GLuint textureID;
+};
+
+static GLContext glContext;
+
+// Utility function to check for OpenGL errors
 void checkOpenGLError(const char* tag) {
     GLenum err;
     while ((err = glGetError()) != GL_NO_ERROR) {
@@ -40,7 +56,8 @@ namespace gfx {
         if (!success) {
             char buf[1024];
             glGetShaderInfoLog(shader, sizeof(buf), nullptr, buf);
-            std::fprintf(stderr, "Shader compilation error: %s\n", buf);
+            std::fprintf(stderr, "[CubeRenderer] Shader compilation error: %s", buf);
+            std::printf("[CubeRenderer] Source: %s", shader_type == GL_VERTEX_SHADER ? "Vertex Shader; " : "Fragment Shader; ");
             glDeleteShader(shader);
             return 0;
         }
@@ -55,7 +72,7 @@ namespace gfx {
         glBindAttribLocation(program, 0, "aPos");
         glBindAttribLocation(program, 1, "aNormal");
         glBindAttribLocation(program, 2, "aTex");
-        glBindAttribLocation(program, 3, "aInstancePos");
+        // glBindAttribLocation(program, 3, "aInstancePos");
 
         glLinkProgram(program);
 
@@ -73,7 +90,7 @@ namespace gfx {
 
     bool CubeRenderer::init() {
         m_cube_mesh = new CubeMesh();
-        if (vertex_shader_source.empty() || fragment_shader_source.empty()) {
+        if (vertex_shader_path.empty() || fragment_shader_path.empty()) {
             std::fprintf(stderr, "Failed to load shader sources: %s, %s\n", vertex_shader_path.c_str(), fragment_shader_path.c_str());
             return false;
         }
@@ -94,23 +111,53 @@ namespace gfx {
         if (!m_program) return false;
 
         // create instance VBO
-        std::printf("[CubeRenderer] Creating instance VBO...\n");
+        std::printf("[CubeRenderer] Creating instance VBO and Binding VAO...\n");
+
         glGenBuffers(1, &m_instance_vbo);
-        std::printf("[CubeRenderer] Generated instance VBO: ID=%u\n", (unsigned int)m_instance_vbo);
-        std::printf("[CubeRenderer] Finished creating instance VBO...\n");
-
         // bind cube VAO and enable instanced attrib
-        std::printf("[CubeRenderer] Binding VAO...\n");
         glBindVertexArray(m_cube_mesh->vao());
-        std::printf("[CubeRenderer] Finished binding VAO...\n");
-
+        
+        std::printf("[CubeRenderer] Generated instance VBO: ID=%u\n", (unsigned int)m_instance_vbo);
+        std::printf("[CubeRenderer] Finished creating instance VBO and binding VAO....\n");
+        
         glBindBuffer(GL_ARRAY_BUFFER, m_instance_vbo);
         checkOpenGLError("After glBindBuffer for instance VBO");
 
-        glEnableVertexAttribArray(3); // aInstancePos
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        // Texture Loading using stbi
+        {
+            glGenTextures(1, &glContext.textureID);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, glContext.textureID);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+            int width, height, nrChannels;
+            unsigned char* data = stbi_load(texture_path, &width, &height, &nrChannels, 0);
+            if (data) {
+                GLenum format = GL_RGB;
+                if (nrChannels == 4) format = GL_RGBA;
+                glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+                std::printf("[CubeRenderer / Texture] Data sent to GPU: Size: %dx%d, channels: %d (Source: %s)\n", width, height, nrChannels, texture_path);
+                glGenerateMipmap(GL_TEXTURE_2D);
+
+            } else {
+                std::printf("[CubeRenderer] Failed to load texture at path: %s\n", texture_path);
+                return false;
+            }
+
+            stbi_image_free(data);
+        }
+
+        // glEnableVertexAttribArray(3); // aInstancePos
+        // glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        
         // glVertexAttribDivisor(3, 1); // advance per instance
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+
         glBindVertexArray(0);
 
         printf("[CubeRenderer] initialized: program=%u, cube_vao=%u\n", (unsigned)m_program, (unsigned)m_cube_mesh->vao());
@@ -136,16 +183,26 @@ namespace gfx {
         glUseProgram(m_program);
         checkOpenGLError("After glUseProgram");
 
+        // set uniforms
+        int uAtlasSize = 16; // assuming 4x4 atlas for example
+        GLint atlasLoc = glGetUniformLocation(m_program, "uAtlasSize");
+        if (atlasLoc >= 0) glUniform1i(atlasLoc, uAtlasSize);
+
         GLint loc = glGetUniformLocation(m_program, "uViewProj");
         if (loc >= 0) glUniformMatrix4fv((GLint)loc, 1, GL_FALSE, viewProj4x4);
-                
+
+        GLuint texIdxLoc = glGetUniformLocation(m_program, "uTexIndex");
+        if (texIdxLoc >= 0) glUniform1i(texIdxLoc, 0); // texture unit 0
+        
         glBindVertexArray(m_cube_mesh->vao());
         checkOpenGLError("After glBindVertexArray");
 
+        // Can't use glDrawArraysInstanced with my old graphic card's OpenGL 3.1
         // glDrawArraysInstanced(GL_TRIANGLES, 0, m_cube_mesh->vertex_count(), m_instance_count);
-        glDrawArrays(GL_TRIANGLES, 0, m_cube_mesh->vertex_count() * m_instance_count);
-        checkOpenGLError("After glDrawArrays");
-        // std::printf("[CubeRenderer] glDrawArrays completed\n");
+
+        // glDrawArrays(GL_TRIANGLES, 0, m_cube_mesh->vertex_count() * m_instance_count);
+        // checkOpenGLError("After glDrawArrays");
+        glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, m_instance_count);
 
         glBindVertexArray(0);
         glUseProgram(0);

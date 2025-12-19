@@ -1,39 +1,32 @@
 #version 140
 
 in vec3 aPos;
-in vec3 aNormal;
+// in vec3 aNormal;
 in vec2 aTex;
 
+// uniform vec3 uOffsets[500];
 uniform mat4 uViewProj;
+uniform int uTexIndex; // インスタンスごとに割り当てられるテクスチャの番号
 
-out vec3 vNormal;
+// out vec3 vNormal;
 out vec2 vTex;
 
 void main() {
     vec3 p = aPos;
     gl_Position = uViewProj * vec4(p, 1.0);
-    vNormal = aNormal;
-    vTex = aTex;
+    
+    // atlas calculation
+    float tileSize= 1.0 / 16.0;
+    
+    // 列と行
+    float col = float(uTexIndex % 16);
+    float row = floor(float(uTexIndex) / 16.0);
+    // float col = 0.0;
+    // float row = 0.0;
+
+    // UV座標: 1.0 基準から 1/分割数 基準にスケールダウンし、オフセットを取得
+    vTex = (aTex * tileSize) + (vec2(col * tileSize, row * tileSize));
 }
-
-// #version 310
-// layout(location = 0) in vec3 aPos;
-// layout(location = 1) in vec3 aNormal;
-// layout(location = 2) in vec2 aTex;
-// layout(location = 3) in vec3 aInstancePos;
-
-// uniform mat4 uViewProj;
-
-// out vec3 vNormal;
-// out vec2 vTex;
-
-// void main() {
-//     // translate cube by instance position (assume instance pos is world coords)
-//     vec3 p = aPos + aInstancePos;
-//     gl_Position = uViewProj * vec4(p, 1.0);
-//     vNormal = aNormal;
-//     vTex = aTex;
-// }
 
 // #version 330 core
 // layout(location = 0) in vec3 vertex_position;

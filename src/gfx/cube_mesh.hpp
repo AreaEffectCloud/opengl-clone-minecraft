@@ -17,6 +17,7 @@ namespace gfx {
         private:
             GLuint m_vao = 0;
             GLuint m_vbo = 0;
+            GLuint m_ebo = 0;
             GLsizei m_vertex_count = 0;
     };
 } // namespace gfx

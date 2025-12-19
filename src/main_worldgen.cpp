@@ -82,6 +82,11 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    // texture
+    glEnable(GL_FRAMEBUFFER_SRGB);
+    glDisable(0x809D); // disable multisampling
+
+    // depth and face culling
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK); // culling back side

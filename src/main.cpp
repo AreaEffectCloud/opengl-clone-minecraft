@@ -2,10 +2,8 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -37,12 +35,12 @@ int main() {
         return -1;
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    #ifdef __APPLE__
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for MacOS
-    #endif
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    // #ifdef __APPLE__
+    //     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for MacOS
+    // #endif
+    //     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // full screen
     // bool full_screen = false;
@@ -71,37 +69,37 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     // glEnable(GL_DEPTH_TEST);
 
-    // Shader ourShader(vertex_shader_source, fragment_shader_source);
+    Shader ourShader(vertex_shader_source, fragment_shader_source);
 
-    // struct World world;
-    // world_init(&world, (u64)123456789ULL, 4);
-    // ivec3s center = { 0, 0, 0 };
-    // struct Chunk* center_chunk = world_create_chunk(&world, center);
-    // if (!center_chunk) {
-    //     std::cerr << "Failed to create center chunk" << std::endl;
-    // }
+    struct World world;
+    world_init(&world, (u64)123456789ULL, 4);
+    ivec3s center = { 0, 0, 0 };
+    struct Chunk* center_chunk = world_create_chunk(&world, center);
+    if (!center_chunk) {
+        std::cerr << "Failed to create center chunk" << std::endl;
+    }
 
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    // glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     
-    // int width, height, nrChannels;
-    // unsigned char* data = stbi_load("./../src/assets/block/cobblestone.png", &width, &height, &nrChannels, 0);
-    // if (data) {
-    //     GLenum format = GL_RGB;
-    //     if (nrChannels == 4) format = GL_RGBA;
-    //     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-    //     glGenerateMipmap(GL_TEXTURE_2D);
-    // } else {
-    //     std::cerr << "Failed to load texture" << std::endl;
-    // }
-    // stbi_image_free(data);
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load("./../src/assets/block/cobblestone.png", &width, &height, &nrChannels, 0);
+    if (data) {
+        GLenum format = GL_RGB;
+        if (nrChannels == 4) format = GL_RGBA;
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+        std::cerr << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
 
-    // ourShader.use();
-    // ourShader.setInt("our_texture", 0);
+    ourShader.use();
+    ourShader.setInt("our_texture", 0);
 
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK); // culling back side
-    glFrontFace(GL_CCW); // define front side as counter clockwise
+    // glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK); // culling back side
+    // glFrontFace(GL_CCW); // define front side as counter clockwise
 
     // main loop
     while (!glfwWindowShouldClose(window)) {

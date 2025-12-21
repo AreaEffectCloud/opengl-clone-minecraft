@@ -33,6 +33,7 @@ static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 static void key_callback(GLFWwindow* window);
 
 int main(int argc, char** argv) {
+    std::printf("\nRunning the program... \n\n[main_worldgen] Starting world generation\n");
     uint32_t seed = 0;
     if (argc >= 2) {
         seed = static_cast<uint32_t>(std::strtoul(argv[1], nullptr, 10));
@@ -88,9 +89,12 @@ int main(int argc, char** argv) {
 
     // depth and face culling
     glEnable(GL_DEPTH_TEST);
+    
+    // culling
     glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK); // culling back side
+    glCullFace(GL_BACK);    
     glFrontFace(GL_CCW); // define front side as counter clockwise
+
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glViewport(0, 0, (int)SCR_WIDTH, (int)SCR_HEIGHT);
 
@@ -130,18 +134,28 @@ int main(int argc, char** argv) {
     // assume spawn chunk at (0,0)
     int base_cx = 0;
     int base_cz = 0;
+
     for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
         for (int x = 0; x < CHUNK_SIZE_X; ++x) {
             for (int y = 0; y < CHUNK_SIZE_Y; ++y) {
+
+                // 動作を軽くするための修正
+                if (instances.size() >= 10) break;
+
                 int world_x = base_cx * CHUNK_SIZE_X + x;
                 int world_z = base_cz * CHUNK_SIZE_Z + z;
                 auto id = world.get_block(world_x, y, world_z);
                 if (id != BlockID::AIR) { // assume 0 == AIR
-                    gfx::Vec3f p; p.x = static_cast<float>(world_x); p.y = static_cast<float>(y); p.z = static_cast<float>(world_z);
+                    gfx::Vec3f p; 
+                    p.x = static_cast<float>(world_x); 
+                    p.y = static_cast<float>(y); 
+                    p.z = static_cast<float>(world_z);
                     instances.push_back(p);
                 }
             }
+            if (instances.size() >= 10) break;
         }
+        if (instances.size() >= 10) break;
     }
     std::printf("[Extra /main_worldgen] built %zu instances from world\n", instances.size());
     // If possible, upload instances to cubeRenderer (debug path) so we can be sure the instanced renderer path works.
@@ -165,7 +179,10 @@ int main(int argc, char** argv) {
             for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
                 for (int x = 0; x < CHUNK_SIZE_X; ++x) {
                     for (int y = 1; y <= 2; ++y) { // y=1,2 の薄い層
-                        gfx::Vec3f p; p.x = static_cast<float>(x); p.y = static_cast<float>(y); p.z = static_cast<float>(z);
+                        gfx::Vec3f p; 
+                        p.x = static_cast<float>(x); 
+                        p.y = static_cast<float>(y); 
+                        p.z = static_cast<float>(z);
                         testInstances.push_back(p);
                     }
                 }
@@ -185,24 +202,24 @@ int main(int argc, char** argv) {
     }
 
     // --- position camera to look at the center of the spawn chunk ---
-    // {
-    //     glm::vec3 target = glm::vec3((float)(CHUNK_SIZE_X / 2), (float)world.sample_height(CHUNK_SIZE_X / 2, CHUNK_SIZE_Z / 2), (float)(CHUNK_SIZE_Z / 2));
-    //     glm::vec3 camPos = target + glm::vec3(0.0f, 8.0f, 20.0f); // adjust as necessary
-    //     camera.Position = camPos;
-    //     glm::vec3 front = glm::normalize(target - camPos);
-    //     // set Front directly (assumes Camera exposes Front member)
-    //     camera.Front = front;
-    //     // try to set yaw/pitch for compatibility (may be unused)
-    //     float yaw = glm::degrees(atan2(front.z, front.x));
-    //     float pitch = glm::degrees(asin(front.y));
-    //     camera.Yaw = yaw;
-    //     camera.Pitch = pitch;
-    //     // if Camera has update function, call it (safe to call if exists)
-    //     // camera.updateCameraVectors(); // uncomment if your Camera exposes this
-    //     std::printf("[Camera /main_worldgen] camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)\n",
-    //         camera.Position.x, camera.Position.y, camera.Position.z,
-    //         target.x, target.y, target.z);
-    // }
+    {
+        glm::vec3 target = glm::vec3((float)(CHUNK_SIZE_X / 2), (float)world.sample_height(CHUNK_SIZE_X / 2, CHUNK_SIZE_Z / 2), (float)(CHUNK_SIZE_Z / 2));
+        glm::vec3 camPos = target + glm::vec3(0.0f, 8.0f, 20.0f); // adjust as necessary
+        camera.Position = camPos;
+        glm::vec3 front = glm::normalize(target - camPos);
+        // set Front directly (assumes Camera exposes Front member)
+        camera.Front = front;
+        // try to set yaw/pitch for compatibility (may be unused)
+        float yaw = glm::degrees(atan2(front.z, front.x));
+        float pitch = glm::degrees(asin(front.y));
+        camera.Yaw = yaw;
+        camera.Pitch = pitch;
+        // if Camera has update function, call it (safe to call if exists)
+        // camera.updateCameraVectors(); // uncomment if your Camera exposes this
+        std::printf("[Camera /main_worldgen] camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)\n",
+            camera.Position.x, camera.Position.y, camera.Position.z,
+            target.x, target.y, target.z);
+    }
 
     while(!glfwWindowShouldClose(window)) {
         float currentFrame = (float)glfwGetTime();

@@ -15,9 +15,6 @@ std::string fragment_shader_path = "../src/assets/shader/fragment_shader.glsl";
 std::string vertex_shader_source = loadShaderSourceFromFile(vertex_shader_path);
 std::string fragment_shader_source = loadShaderSourceFromFile(fragment_shader_path);
 
-// const char* vertex_shader_source = "../src/assets/shader/vertex_shader.glsl";
-// const char* fragment_shader_source = "../src/assets/shader/fragment_shader.glsl";
-
 // Texture Atlas
 const char* texture_path = "../src/assets/textures/texture_atlas.png";
 
@@ -70,9 +67,9 @@ namespace gfx {
         glAttachShader(program, fragment_shader);
 
         glBindAttribLocation(program, 0, "aPos");
-        glBindAttribLocation(program, 1, "aNormal");
+        glBindAttribLocation(program, 1, "aNormal"); // if needed in future
         glBindAttribLocation(program, 2, "aTex");
-        // glBindAttribLocation(program, 3, "aInstancePos");
+        glBindAttribLocation(program, 4, "aFaceID");
 
         glLinkProgram(program);
 
@@ -141,7 +138,7 @@ namespace gfx {
                 if (nrChannels == 4) format = GL_RGBA;
                 glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
-                std::printf("[CubeRenderer / Texture] Data sent to GPU: Size: %dx%d, channels: %d (Source: %s)\n", width, height, nrChannels, texture_path);
+                std::printf("[CubeRenderer / Texture] Data sent GPU: Size: %dx%d, Channels: %d, \nSource: %s\n", width, height, nrChannels, texture_path);
                 glGenerateMipmap(GL_TEXTURE_2D);
 
             } else {
@@ -154,12 +151,9 @@ namespace gfx {
 
         // glEnableVertexAttribArray(3); // aInstancePos
         // glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        
-        // glVertexAttribDivisor(3, 1); // advance per instance
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-
         glBindVertexArray(0);
-
         printf("[CubeRenderer] initialized: program=%u, cube_vao=%u\n", (unsigned)m_program, (unsigned)m_cube_mesh->vao());
 
         return true;
@@ -167,6 +161,7 @@ namespace gfx {
 
     void CubeRenderer::update_instances(const std::vector<Vec3f>& positions) {
         glBindBuffer(GL_ARRAY_BUFFER, m_instance_vbo);
+        m_instances = positions;
         if (!positions.empty()) {
             glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(Vec3f), positions.data(), GL_STATIC_DRAW);
         } else {
@@ -178,32 +173,27 @@ namespace gfx {
     }
 
     void CubeRenderer::draw(const float* viewProj4x4) {
-        if (!m_program || !m_cube_mesh) return;
-
+        if (!m_program || !m_cube_mesh || m_instances.empty()) return;
         glUseProgram(m_program);
-        checkOpenGLError("After glUseProgram");
 
-        // set uniforms
-        int uAtlasSize = 16; // assuming 4x4 atlas for example
-        GLint atlasLoc = glGetUniformLocation(m_program, "uAtlasSize");
-        if (atlasLoc >= 0) glUniform1i(atlasLoc, uAtlasSize);
+        // get uniforms locations
+        GLint vpLoc = glGetUniformLocation(m_program, "uViewProj");
+        if (vpLoc >= 0) glUniformMatrix4fv(vpLoc, 1, GL_FALSE, viewProj4x4);
 
-        GLint loc = glGetUniformLocation(m_program, "uViewProj");
-        if (loc >= 0) glUniformMatrix4fv((GLint)loc, 1, GL_FALSE, viewProj4x4);
+        GLint posLoc = glGetUniformLocation(m_program, "uModelPos");
+        GLint blockTypeLoc = glGetUniformLocation(m_program, "uBlockType");
+        // GLint texLoc = glGetUniformLocation(m_program, "uTexIndex");
 
-        GLuint texIdxLoc = glGetUniformLocation(m_program, "uTexIndex");
-        if (texIdxLoc >= 0) glUniform1i(texIdxLoc, 0); // texture unit 0
-        
         glBindVertexArray(m_cube_mesh->vao());
-        checkOpenGLError("After glBindVertexArray");
 
-        // Can't use glDrawArraysInstanced with my old graphic card's OpenGL 3.1
-        // glDrawArraysInstanced(GL_TRIANGLES, 0, m_cube_mesh->vertex_count(), m_instance_count);
+        for (const auto& pos : m_instances) {
+            if (posLoc >= 0) glUniform3f(posLoc, pos.x, pos.y, pos.z);
+            if (blockTypeLoc >= 0) glUniform1i(blockTypeLoc, 3); // grass block for testing
+            // if (texLoc >= 0) glUniform1i(texLoc, 0);
 
-        // glDrawArrays(GL_TRIANGLES, 0, m_cube_mesh->vertex_count() * m_instance_count);
-        // checkOpenGLError("After glDrawArrays");
-        glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, m_instance_count);
-
+            // Draw call for single instance
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0);
+        }
         glBindVertexArray(0);
         glUseProgram(0);
     }

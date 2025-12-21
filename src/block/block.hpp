@@ -8,7 +8,7 @@ namespace ocm {
         STONE = 1,
         DIRT = 2,
         GRASS = 3,
-        WOOD = 4,
+        LOG = 4,
         PLANKS = 5,
         LEAVES = 6,
         WATER = 7,

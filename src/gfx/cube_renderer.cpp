@@ -187,9 +187,13 @@ namespace gfx {
         glBindVertexArray(m_cube_mesh->vao());
 
         for (const auto& pos : m_instances) {
-            if (posLoc >= 0) glUniform3f(posLoc, pos.x, pos.y, pos.z);
-            if (blockTypeLoc >= 0) glUniform1i(blockTypeLoc, 3); // grass block for testing
-            // if (texLoc >= 0) glUniform1i(texLoc, 0);
+            glUniform3f(posLoc, pos.x, pos.y, pos.z);
+
+            if (pos.y > 5.5f) {
+                glUniform1i(blockTypeLoc, 3);
+            } else {
+                glUniform1i(blockTypeLoc, 2);
+            }
 
             // Draw call for single instance
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0);

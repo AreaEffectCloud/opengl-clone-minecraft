@@ -15,11 +15,13 @@ void main() {
     gl_Position = uViewProj * vec4(p, 1.0);
 
     int texIndex = 0;
-    if (uBlockType == 3) { // grass block
-        if (aFaceID < 0.5)      texIndex = 1; // top
-        else if (aFaceID < 1.5) texIndex = 0; // bottom
-        else                    texIndex = 2; // other side
-    } else if (uBlockType == 4) {
+    if (uBlockType == 2) { // dirt block
+        texIndex = 2;
+    } else if (uBlockType == 3) { // grass block
+        if (aFaceID < 0.5)      texIndex = 1; // other
+        else if (aFaceID < 1.5) texIndex = 0; // top
+        else                    texIndex = 2; // bottom
+    } else if (uBlockType == 4) { // log block
         if (aFaceID == 1.0 || aFaceID == 2.0) texIndex = 10;
         else texIndex = 11;
     } else {

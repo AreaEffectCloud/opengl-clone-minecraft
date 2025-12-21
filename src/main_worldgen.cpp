@@ -89,6 +89,7 @@ int main(int argc, char** argv) {
 
     // depth and face culling
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     
     // culling
     glEnable(GL_CULL_FACE);
@@ -129,78 +130,67 @@ int main(int argc, char** argv) {
         worldrenderer.upload_world(world);
         didUploadInstances = true;
     }
+
+
+
     // --- build instance list from world for debugging/verification ---
-    std::vector<gfx::Vec3f> instances;
-    // assume spawn chunk at (0,0)
-    int base_cx = 0;
-    int base_cz = 0;
+    std::vector<gfx::Vec3f> world_blocks;
 
-    for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
-        for (int x = 0; x < CHUNK_SIZE_X; ++x) {
-            for (int y = 0; y < CHUNK_SIZE_Y; ++y) {
-
-                // 動作を軽くするための修正
-                if (instances.size() >= 10) break;
-
-                int world_x = base_cx * CHUNK_SIZE_X + x;
-                int world_z = base_cz * CHUNK_SIZE_Z + z;
-                auto id = world.get_block(world_x, y, world_z);
-                if (id != BlockID::AIR) { // assume 0 == AIR
-                    gfx::Vec3f p; 
-                    p.x = static_cast<float>(world_x); 
-                    p.y = static_cast<float>(y); 
-                    p.z = static_cast<float>(world_z);
-                    instances.push_back(p);
-                }
+    // 16x16x16 の範囲にブロックを敷き詰める
+    for (int x = 0; x < 16; ++x) {
+        for (int z = 0; z < 16; ++z) {
+            // 地面の高さを決める（とりあえず y=0 ～ y=2 を土、y=3 を草にする）
+            for (int y = 0; y < 4; ++y) {
+                gfx::Vec3f p;
+                p.x = static_cast<float>(x);
+                p.y = static_cast<float>(y);
+                p.z = static_cast<float>(z);
+                world_blocks.push_back(p);
             }
-            if (instances.size() >= 10) break;
-        }
-        if (instances.size() >= 10) break;
-    }
-    std::printf("[Extra /main_worldgen] built %zu instances from world\n", instances.size());
-    // If possible, upload instances to cubeRenderer (debug path) so we can be sure the instanced renderer path works.
-    if (cubeRendererReady && !instances.empty()) {
-        cubeRenderer.update_instances(instances);
-        didUploadInstances = true;
-        // prefer drawing with cubeRenderer for debug, disable worldrenderer drawing
-        worldRendererReady = false;
-        std::printf("[Extra /main_worldgen] uploaded %zu instances to cubeRenderer (debug path)\n", instances.size());
-    }
-    // もし world の高さがすべて 0 で描画対象がない場合のフォールバック:
-    // world.sample_height を用いて判定する（中心点をチェック）。0 なら一時的にテストインスタンスを生成する。
-    int centerX = CHUNK_SIZE_X / 2;
-    int centerZ = CHUNK_SIZE_Z / 2;
-    int centerH = world.sample_height(centerX, centerZ);
-    if (centerH <= 0) {
-        std::printf("[Extra /main_worldgen] detected zero-height world; creating fallback test instances\n");
-        if (cubeRendererReady) {
-            std::vector<gfx::Vec3f> testInstances;
-            // create a CHUNK_SIZE_X x 2 x CHUNK_SIZE_Z block volume at world coords [0..CHUNK_SIZE_X-1] x [1..2] x [0..CHUNK_SIZE_Z-1]
-            for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
-                for (int x = 0; x < CHUNK_SIZE_X; ++x) {
-                    for (int y = 1; y <= 2; ++y) { // y=1,2 の薄い層
-                        gfx::Vec3f p; 
-                        p.x = static_cast<float>(x); 
-                        p.y = static_cast<float>(y); 
-                        p.z = static_cast<float>(z);
-                        testInstances.push_back(p);
-                    }
-                }
-            }
-            std::printf("[Extra /main_worldgen] fallback will upload %zu test instances\n", testInstances.size());
-            cubeRenderer.update_instances(testInstances);
-            didUploadInstances = true;
-            // Ensure we use cubeRenderer for draw by disabling worldRendererReady
-            worldRendererReady = false;
-            cubeRendererReady = true;
-        } else {
-            std::fprintf(stderr, "[Extra /main_worldgen] cubeRenderer not ready; cannot create fallback instances\n");
         }
     }
-    if (!didUploadInstances) {
-        std::fprintf(stderr, "[Extra /main_worldgen] warning: no instances uploaded (world may be empty)\n");
-    }
+    // Rendererにアップロード
+    cubeRenderer.update_instances(world_blocks);
 
+
+    // std::vector<gfx::Vec3f> instances;
+    // // assume spawn chunk at (0,0)
+    // int base_cx = 0;
+    // int base_cz = 0;
+
+    // for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
+    //     for (int x = 0; x < CHUNK_SIZE_X; ++x) {
+    //         for (int y = 0; y < CHUNK_SIZE_Y; ++y) {
+
+    //             // 動作を軽くするための修正
+    //             if (instances.size() >= 10) break;
+
+    //             int world_x = base_cx * CHUNK_SIZE_X + x;
+    //             int world_z = base_cz * CHUNK_SIZE_Z + z;
+    //             auto id = world.get_block(world_x, y, world_z);
+    //             if (id != BlockID::AIR) { // assume 0 == AIR
+    //                 gfx::Vec3f p; 
+    //                 p.x = static_cast<float>(world_x); 
+    //                 p.y = static_cast<float>(y); 
+    //                 p.z = static_cast<float>(world_z);
+    //                 instances.push_back(p);
+    //             }
+    //         }
+    //         if (instances.size() >= 10) break;
+    //     }
+    //     if (instances.size() >= 10) break;
+    // }
+    // std::printf("[Extra /main_worldgen] built %zu instances from world\n", instances.size());
+    // // If possible, upload instances to cubeRenderer (debug path) so we can be sure the instanced renderer path works.
+    // if (cubeRendererReady && !instances.empty()) {
+    //     cubeRenderer.update_instances(instances);
+    //     didUploadInstances = true;
+    //     // prefer drawing with cubeRenderer for debug, disable worldrenderer drawing
+    //     worldRendererReady = false;
+    //     std::printf("[Extra /main_worldgen] uploaded %zu instances to cubeRenderer (debug path)\n", instances.size());
+    // }
+
+    
     // --- position camera to look at the center of the spawn chunk ---
     {
         glm::vec3 target = glm::vec3((float)(CHUNK_SIZE_X / 2), (float)world.sample_height(CHUNK_SIZE_X / 2, CHUNK_SIZE_Z / 2), (float)(CHUNK_SIZE_Z / 2));

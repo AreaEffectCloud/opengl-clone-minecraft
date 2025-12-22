@@ -180,7 +180,7 @@ namespace gfx {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
-    void CubeRenderer::draw(const float* viewProj4x4) {
+    void CubeRenderer::draw(const float* viewProj4x4, const glm::vec3& camPos) {
         if (m_index_count == 0) return;
 
         glUseProgram(m_program);
@@ -188,6 +188,15 @@ namespace gfx {
         // get uniforms locations
         GLint vpLoc = glGetUniformLocation(m_program, "uViewProj");
         if (vpLoc >= 0) glUniformMatrix4fv(vpLoc, 1, GL_FALSE, viewProj4x4);
+
+        // set camera position uniform
+        GLint viewPosLoc = glGetUniformLocation(m_program, "uViewPos");
+        if (viewPosLoc >= 0) glUniform3fv(viewPosLoc, 1, &camPos[0]);
+
+        // set fog uniforms
+        glUniform3f(glGetUniformLocation(m_program, "uFogColor"), 0.53f, 0.81f, 0.92f);
+        glUniform1f(glGetUniformLocation(m_program, "uFogNear"), 60.0f); // start distance
+        glUniform1f(glGetUniformLocation(m_program, "uFogFar"), 100.0f); // end distance
 
         // bind texture
         glActiveTexture(GL_TEXTURE0);

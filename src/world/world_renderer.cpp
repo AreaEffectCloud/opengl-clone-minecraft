@@ -56,7 +56,7 @@ namespace ocm {
         std::printf("[WorldRenderer] Total Mesh: %zu vertices, %zu faces\n", vertices.size(), (int)(indices.size() / 6));
     }
 
-    void WorldRenderer::draw(const float* viewProj4x4) {
-        m_renderer.draw(viewProj4x4);
+    void WorldRenderer::draw(const float* viewProj4x4, const glm::vec3& camPos) {
+        m_renderer.draw(viewProj4x4, camPos);
     }
 } // namespace ocm

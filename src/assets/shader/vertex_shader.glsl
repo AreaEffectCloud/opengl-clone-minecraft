@@ -6,11 +6,15 @@ in float aFaceID;
 in float aBlockID;
 
 uniform mat4 uViewProj;
+uniform vec3 uViewPos;
 
 out vec2 vTex;
+out float vDist;
 
 void main() {
     gl_Position = uViewProj * vec4(aPos, 1.0);
+
+    vDist = distance(aPos, uViewPos);
 
     int type = int(aBlockID);
     int texIndex = 0;

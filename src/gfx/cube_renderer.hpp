@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <glad/glad.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 namespace gfx {
     struct ChunkVertex { 
         float x, y, z; 
@@ -22,7 +25,7 @@ namespace gfx {
             // 構築されたメッシュをGPUに転送
             void update_mesh(const std::vector<ChunkVertex>& vertices, const std::vector<uint32_t>& indices);
 
-            void draw(const float* viewProj4x4);
+            void draw(const float* viewProj4x4, const glm::vec3& camPos);
 
             GLuint program() const noexcept { return m_program; };
 

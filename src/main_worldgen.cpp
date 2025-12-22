@@ -164,9 +164,9 @@ int main(int argc, char** argv) {
         glm::mat4 viewProj = projection * view;
 
         if (worldRendererReady)
-            worldrenderer.draw(glm::value_ptr(viewProj));
+            worldrenderer.draw(glm::value_ptr(viewProj), camera.Position);
         else if (cubeRendererReady)
-            cubeRenderer.draw(glm::value_ptr(viewProj));
+            cubeRenderer.draw(glm::value_ptr(viewProj), camera.Position);
 
         GLenum err = glGetError();
         if (err != GL_NO_ERROR) {

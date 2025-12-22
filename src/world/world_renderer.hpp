@@ -15,7 +15,7 @@ namespace ocm {
 
             void upload_world(const World& world);
 
-            void draw(const float* viewProj4x4);
+            void draw(const float* viewProj4x4, const glm::vec3& camPos);
 
         private:
             gfx::CubeRenderer m_renderer;

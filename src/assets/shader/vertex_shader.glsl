@@ -6,7 +6,6 @@ in float aFaceID;
 in float aBlockID;
 
 uniform mat4 uViewProj;
-// uniform int uBlockType;
 
 out vec2 vTex;
 

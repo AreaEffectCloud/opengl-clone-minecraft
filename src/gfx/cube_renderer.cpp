@@ -70,7 +70,7 @@ namespace gfx {
         if (!success) {
             char buf[1024];
             glGetProgramInfoLog(program, sizeof(buf), nullptr, buf);
-            std::fprintf(stderr, "Program linking error: %s\n", buf);
+            std::fprintf(stderr, "[CubeRenderer] Program linking error: %s\n", buf);
             glDeleteProgram(program);
             return 0;
         }
@@ -79,7 +79,7 @@ namespace gfx {
 
     bool CubeRenderer::init() {
         if (vertex_shader_path.empty() || fragment_shader_path.empty()) {
-            std::fprintf(stderr, "Failed to load shader sources: %s, %s\n", vertex_shader_path.c_str(), fragment_shader_path.c_str());
+            std::fprintf(stderr, "[CubeRenderer] Failed to load shader sources: %s, %s\n", vertex_shader_path.c_str(), fragment_shader_path.c_str());
             return false;
         }
 
@@ -188,9 +188,6 @@ namespace gfx {
         // get uniforms locations
         GLint vpLoc = glGetUniformLocation(m_program, "uViewProj");
         if (vpLoc >= 0) glUniformMatrix4fv(vpLoc, 1, GL_FALSE, viewProj4x4);
-
-        // GLint blockTypeLoc = glGetUniformLocation(m_program, "uBlockType");
-        // if (blockTypeLoc >= 0) glUniform1i(blockTypeLoc, 3); // default block type
 
         // bind texture
         glActiveTexture(GL_TEXTURE0);

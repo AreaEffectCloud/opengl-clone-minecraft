@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
     
     // culling
     glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);    
+    glCullFace(GL_BACK);
     glFrontFace(GL_CCW); // define front side as counter clockwise
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -130,66 +130,7 @@ int main(int argc, char** argv) {
         worldrenderer.upload_world(world);
         didUploadInstances = true;
     }
-
-
-
-    // --- build instance list from world for debugging/verification ---
-    std::vector<gfx::ChunkVertex> world_blocks;
-
-    // 16x16x16 の範囲にブロックを敷き詰める
-    for (int x = 0; x < 16; ++x) {
-        for (int z = 0; z < 16; ++z) {
-            // 地面の高さを決める（とりあえず y=0 ～ y=2 を土、y=3 を草にする）
-            for (int y = 0; y < 4; ++y) {
-                gfx::ChunkVertex p;
-                p.x = static_cast<float>(x);
-                p.y = static_cast<float>(y);
-                p.z = static_cast<float>(z);
-                world_blocks.push_back(p);
-            }
-        }
-    }
-    // Rendererにアップロード
-    // cubeRenderer.update_mesh(world_blocks);
-
-
-    // std::vector<gfx::Vec3f> instances;
-    // // assume spawn chunk at (0,0)
-    // int base_cx = 0;
-    // int base_cz = 0;
-
-    // for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
-    //     for (int x = 0; x < CHUNK_SIZE_X; ++x) {
-    //         for (int y = 0; y < CHUNK_SIZE_Y; ++y) {
-
-    //             // 動作を軽くするための修正
-    //             if (instances.size() >= 10) break;
-
-    //             int world_x = base_cx * CHUNK_SIZE_X + x;
-    //             int world_z = base_cz * CHUNK_SIZE_Z + z;
-    //             auto id = world.get_block(world_x, y, world_z);
-    //             if (id != BlockID::AIR) { // assume 0 == AIR
-    //                 gfx::Vec3f p; 
-    //                 p.x = static_cast<float>(world_x); 
-    //                 p.y = static_cast<float>(y); 
-    //                 p.z = static_cast<float>(world_z);
-    //                 instances.push_back(p);
-    //             }
-    //         }
-    //         if (instances.size() >= 10) break;
-    //     }
-    //     if (instances.size() >= 10) break;
-    // }
-    // std::printf("[Extra /main_worldgen] built %zu instances from world\n", instances.size());
-    // // If possible, upload instances to cubeRenderer (debug path) so we can be sure the instanced renderer path works.
-    // if (cubeRendererReady && !instances.empty()) {
-    //     cubeRenderer.update_instances(instances);
-    //     didUploadInstances = true;
-    //     // prefer drawing with cubeRenderer for debug, disable worldrenderer drawing
-    //     worldRendererReady = false;
-    //     std::printf("[Extra /main_worldgen] uploaded %zu instances to cubeRenderer (debug path)\n", instances.size());
-    // }
-
+    
     
     // --- position camera to look at the center of the spawn chunk ---
     {

@@ -4,6 +4,7 @@
 #include <cinttypes>
 #include <iostream>
 #include <numeric>
+#include <map>
 
 namespace ocm {
     World::World() {
@@ -24,25 +25,15 @@ namespace ocm {
 
     void World::init(uint32_t seed) {
         m_seed = seed;
-        m_spawn_chunk.reset();
+        m_chunks.clear();
         // generate spawn chunk at (0,0) by default
         generate_chunk(0, 0);
         std::printf("[World] initialized with seed=%u\n", m_seed);
     }
 
     void World::destroy() {
-        m_spawn_chunk.reset();
+        m_chunks.clear();
     }
-
-    // double World::pseudo_noise(int x, int z, uint32_t seed) const {
-    //     // 32/64-bit hashing based pseudo-noise in [0, 1)
-    //     uint64_t h = static_cast<uint64_t>(x) * 73428767ULL;
-    //     h ^= static_cast<uint64_t>(z) * 91278341ULL;
-    //     h ^= static_cast<uint64_t>(seed) + 0x9e3779b97f4a7c15ULL;
-    //     h = (h << 13) ^ h;
-    //     uint64_t res = (h * (h * h * 15731ULL + 789221ULL) + 1376312589ULL) & 0x7fffffffffffffffULL;
-    //     return static_cast<double>(res) / static_cast<double>(0x7fffffffffffffffULL);
-    // }
 
     // Noise functions for terrain generation
     float World::fade(float t) const {
@@ -89,110 +80,135 @@ namespace ocm {
         return (res + 1.0f) / 2.0f; // Normalize to [0,1]
     }
 
-    // Not used currently
-    int World::sample_height(int world_x, int world_z) const {
-        float noise_scale_x = 0.05f;
-        float noise_scale_z = 0.05f;
-        float height_map = 8.0f;
-        float base_height = 4.0f;
+    float World::fractal_noise(float x, float z, int octaves, float persistence, float lacunarity) const {
+        float total = 0.0f;
+        float frequency = 1.0f;
+        float amplitude = 1.0f;
+        float maxValue = 0.0f; // Used for normalizing result to [0,1]
 
-        float noise_val = perlin_noise(
-            static_cast<float>(world_x) * noise_scale_x,
-            0.1f,
-            static_cast<float>(world_z) * noise_scale_z
-        );
+        for (int i = 0; i < octaves; i++) {
+            total += perlin_noise(x * frequency, 0.1f, z * frequency) * amplitude;
 
-        int height = static_cast<int>(base_height + noise_val * height_map);
-        if (height < 0) height = 0;
-        if (height >= CHUNK_SIZE_Y) height = CHUNK_SIZE_Y - 1;
+            maxValue += amplitude;
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
 
-        return height;
+        return total / maxValue;
     }
 
     void World::generate_chunk(int cx, int cz) {
-        // Replace existing spawn chunk (simple)
-        m_spawn_chunk = std::make_unique<Chunk>(cx, cz);
-
-        // ノイズのスケールやオフセットを調整して地形の見た目を制御
-        float noise_scale_x = 0.05f;
-        float noise_scale_z = 0.05f;
-        float height_map = 8.0f;
-        float base_height = 4.0f;
+        // 複数のチャンクを管理する場合、m_spawn_chunk ではなく 
+        // std::map<std::pair<int, int>, ChunkPtr> m_chunks 等での管理が理想です
+        auto chunk = std::make_unique<Chunk>(cx, cz);
 
         for (int x = 0; x < CHUNK_SIZE_X; x++) {
             for (int z = 0; z < CHUNK_SIZE_Z; z++) {
-                
                 // translate chunk-local coordinates to world coordinates
-                int world_x = static_cast<float>(cx * CHUNK_SIZE_X + x);
-                int world_z = static_cast<int>(cz * CHUNK_SIZE_Z + z);
-
-                float noise_val = perlin_noise(
-                    world_x * noise_scale_x,
-                    0.1f,
-                    world_z * noise_scale_z
+                float world_x = static_cast<float>(cx * CHUNK_SIZE_X + x);
+                float world_z = static_cast<float>(cz * CHUNK_SIZE_Z + z);
+                float noise_val = fractal_noise(
+                    world_x * 0.03f,
+                    world_z * 0.03f,
+                    4,      // octaves: 波の合成数
+                    0.5f,   // persistence : 各オクターブの振幅減衰率
+                    2.0f    // lacunarity : 各オクターブの周波数増加率
                 );
+                int height = static_cast<int>(noise_val * (CHUNK_SIZE_Y - 1)) + 1;
 
-                int height = static_cast<int>(base_height + noise_val * height_map);
-
-                for (int y = 0; y < height; y++) {
+                for (int y = 0; y < CHUNK_SIZE_Y; y++) {
                     uint8_t id = static_cast<uint8_t>(BlockID::AIR);
-                    if (y == height - 1) {
-                        id = static_cast<uint8_t>(BlockID::GRASS);
-                    } else if (y >= height - 4) {
-                        id = static_cast<uint8_t>(BlockID::DIRT);
-                    } else {
+                    if (y < height) {
                         id = static_cast<uint8_t>(BlockID::STONE);
+                        if (y == height - 1) {
+                            id = static_cast<uint8_t>(BlockID::GRASS);
+                        } else if (y >= height - 4) {
+                            id = static_cast<uint8_t>(BlockID::DIRT);
+                        }
                     }
-                    m_spawn_chunk->set_block(x, y, z, id);
+                    chunk->set_block(x, y, z, id);
                 }   
             }
         }
-        std::printf("[World] generated chunk at (%d, %d)\n", cx, cz);
+        m_chunks[{cx, cz}] = std::move(chunk);
     }
 
-    BlockID World::get_block(int world_x, int y, int world_z) const {
-        if (!m_spawn_chunk) return BlockID::AIR;
-        // only supports spawn chunk (cx,cz)
-        int local_x = world_x - m_spawn_cx * CHUNK_SIZE_X;
-        int local_z = world_z - m_spawn_cz * CHUNK_SIZE_Z;
-
-        if (local_x < 0 || local_x >= CHUNK_SIZE_X || local_z < 0 || local_z >= CHUNK_SIZE_Z || y < 0 || y >= CHUNK_SIZE_Y) {
-            return BlockID::AIR;
+    void World::generate_world(int width, int depth) {
+        m_chunks.clear();
+        for (int cz = 0; cz < depth; cz++) {
+            for (int cx = 0; cx < width; cx++) {
+                generate_chunk(cx, cz);
+            }
         }
+    }
 
-        uint8_t id = m_spawn_chunk->get_block(local_x, y, local_z);
-        return static_cast<BlockID>(id);
+    int World::sample_height(int world_x, int world_z) const {
+        float noise_val = fractal_noise(
+            world_x * 0.03f,
+            world_z * 0.03f,
+            4,      // octaves
+            0.5f,   // persistence
+            2.0f    // lacunarity
+        );
+
+        int height = static_cast<int>(noise_val * (CHUNK_SIZE_Y - 1)) + 1;
+        return std::min(std::max(height, 0), CHUNK_SIZE_Y - 1);
+    }
+    
+    BlockID World::get_block(int world_x, int world_y, int world_z) const {
+        if (world_y < 0 || world_y >= CHUNK_SIZE_Y) return BlockID::AIR;
+
+        // ワールド座標からチャンク座標 (cx, cz) を計算
+        // 正の座標系を想定しているが、負の座標も考慮する場合はfloorを使う
+        int cx = world_x >= 0 ? world_x / CHUNK_SIZE_X : (world_x + 1) / CHUNK_SIZE_X - 1;
+        int cz = world_z >= 0 ? world_z / CHUNK_SIZE_Z : (world_z + 1) / CHUNK_SIZE_Z - 1;
+
+        // チャンク内ローカル座標を計算
+        int lx = world_x - (cx * CHUNK_SIZE_X);
+        int lz = world_z - (cz * CHUNK_SIZE_Z);
+
+        auto it = m_chunks.find({cx, cz});
+        if (it != m_chunks.end()) {
+            return static_cast<BlockID>(it->second->get_block(lx, world_y, lz));
+        }
+        return BlockID::AIR;
     }
 
     void World::dump_stats() const {
-        if (!m_spawn_chunk) {
+        if (m_chunks.empty()) {
             std::puts("[World] no chunks generated.\n");
             return;
         }
-        // compute min/max height (based on first column of chunk)
-        int minh = CHUNK_SIZE_Y, maxh = 0;
-        for (int z = 0; z < CHUNK_SIZE_Z; z++) {
-            for (int x = 0; x < CHUNK_SIZE_X; x++) {
-                int world_x = m_spawn_cx * CHUNK_SIZE_X + x;
-                int world_z = m_spawn_cz * CHUNK_SIZE_Z + z;
-                int h = sample_height(world_x, world_z);
-                if (h < minh) minh = h;
-                if (h > maxh) maxh = h;
+
+        int total_min_h = CHUNK_SIZE_Y;
+        int total_max_h = 0;
+
+        // 全チャンクをループして統計を取る
+        for (auto const& [coords, chunkPtr] : m_chunks) {
+            int cx = coords.first;
+            int cz = coords.second;
+
+            int chunk_min_h = CHUNK_SIZE_Y;
+            int chunk_max_h = 0;
+
+            // チャンク内の全カラムの高さをサンプリング
+            for (int z = 0; z < CHUNK_SIZE_Z; z++) {
+                for (int x = 0; x < CHUNK_SIZE_X; x++) {
+                    int world_x = cx * CHUNK_SIZE_X + x;
+                    int world_z = cz * CHUNK_SIZE_Z + z;
+                    
+                    int h = sample_height(world_x, world_z);
+                    
+                    if (h < chunk_min_h) chunk_min_h = h;
+                    if (h > chunk_max_h) chunk_max_h = h;
+                }
             }
+            // ワールド全体の最小・最大を更新
+            if (chunk_min_h < total_min_h) total_min_h = chunk_min_h;
+            if (chunk_max_h > total_max_h) total_max_h = chunk_max_h;
         }
-        std::printf("[World] chunk (%d, %d) height Min=%d, Max=%d\n", m_spawn_cx, m_spawn_cz, minh, maxh);
-
-        // print center cross sample heights for quick visual check
-        int cx = CHUNK_SIZE_X / 2;
-        int cz = CHUNK_SIZE_Z / 2;
-
-        std::printf("[World] center row heights (z=%d): ", cz);
-        for (int x = 0; x < CHUNK_SIZE_X; x++) {
-            int world_x = m_spawn_cx * CHUNK_SIZE_X + x;
-            int world_z = m_spawn_cz * CHUNK_SIZE_Z + cz;
-            int h = sample_height(world_x, world_z);
-            std::printf("%d ", h);
-        }
-        std::printf("\n");
+        std::printf("---------------------------\n");
+        std::printf("Global Height Range: [%d - %d]\n", total_min_h, total_max_h);
+        std::printf("---------------------------\n");
     }
 } // namespace ocm

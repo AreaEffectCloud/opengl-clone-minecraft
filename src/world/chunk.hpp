@@ -17,7 +17,7 @@ namespace ocm {
 
     constexpr int CHUNK_SIZE_X = 16;
     constexpr int CHUNK_SIZE_Z = 16;
-    constexpr int CHUNK_SIZE_Y = 8;
+    constexpr int CHUNK_SIZE_Y = 16;
     
     class Chunk {
         public:

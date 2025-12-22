@@ -44,11 +44,11 @@ int main(int argc, char** argv) {
 
     World world;
     world.init(seed);
-    // generate a few neighboring chunks optionally
-    // For initial stage we generate only (0,0)
+    std::printf("[main_worldgen] Generating 4x4 world chunks...\n");
+    world.generate_world(4, 4); // generate 4x4 chunks
     world.dump_stats();
 
-    int sample_h = world.sample_height(CHUNK_SIZE_X / 2, CHUNK_SIZE_Z / 2);
+    int sample_h = world.sample_height(CHUNK_SIZE_X * 2, CHUNK_SIZE_Z * 2);
     std::printf("[main_worldgen] sample height at center = %d\n", sample_h);
 
     if (!glfwInit()) {
@@ -121,32 +121,30 @@ int main(int argc, char** argv) {
     } else {
         cubeRendererReady = true;
     }
-
-    // Add a cube instance for each non-air block in the world's spawn chunk
-    // 
-    // world の spawn チャンクをアップロードしてインスタンスバッファを作る
-    bool didUploadInstances = false;
+    
     if (worldRendererReady) {
+        std::printf("[main] Uploading combined 16-chunk mesh to GPU...\n");
         worldrenderer.upload_world(world);
-        didUploadInstances = true;
+        std::printf("[main] Upload complete.\n");
     }
-    
-    
+
     // --- position camera to look at the center of the spawn chunk ---
     {
-        glm::vec3 target = glm::vec3((float)(CHUNK_SIZE_X / 2), (float)world.sample_height(CHUNK_SIZE_X / 2, CHUNK_SIZE_Z / 2), (float)(CHUNK_SIZE_Z / 2));
-        glm::vec3 camPos = target + glm::vec3(0.0f, 8.0f, 20.0f); // adjust as necessary
+        int centerX = (CHUNK_SIZE_X * 4) / 2;;
+        int centerZ = (CHUNK_SIZE_Z * 4) / 2;
+        float groundH = (float)world.sample_height(centerX, centerZ);
+
+        glm::vec3 target = glm::vec3((float)centerX, groundH, (float)centerZ);
+        glm::vec3 camPos = target + glm::vec3(-20.0f, 25.0f, -20.0f);
         camera.Position = camPos;
+
         glm::vec3 front = glm::normalize(target - camPos);
-        // set Front directly (assumes Camera exposes Front member)
         camera.Front = front;
-        // try to set yaw/pitch for compatibility (may be unused)
-        float yaw = glm::degrees(atan2(front.z, front.x));
-        float pitch = glm::degrees(asin(front.y));
-        camera.Yaw = yaw;
-        camera.Pitch = pitch;
-        // if Camera has update function, call it (safe to call if exists)
-        // camera.updateCameraVectors(); // uncomment if your Camera exposes this
+        camera.Yaw   = glm::degrees(std::atan2(front.z, front.x));
+        camera.Pitch = glm::degrees(std::asin(front.y));
+        
+        camera.updateCameraVectors();
+
         std::printf("[Camera /main_worldgen] camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)\n",
             camera.Position.x, camera.Position.y, camera.Position.z,
             target.x, target.y, target.z);

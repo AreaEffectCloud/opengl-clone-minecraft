@@ -10,28 +10,41 @@ namespace ocm {
     }
 
     void WorldRenderer::upload_world(const World& world) {
-        m_positions.clear();
+        std::vector<gfx::ChunkVertex> vertices;
+        std::vector<uint32_t> indices;
+        uint32_t vertex_offset = 0; 
+
         // For simplicity, only upload blocks from the spawn chunk
-        int base_cx = 0;
-        int base_cz = 0;
-        for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
-            for (int x = 0; x < CHUNK_SIZE_X; ++x) {
-                for (int y = 0; y < CHUNK_SIZE_Y; ++y) {
-                    int world_x = base_cx * CHUNK_SIZE_X + x;
-                    int world_z = base_cz * CHUNK_SIZE_Z + z;
-                    auto id = world.get_block(world_x, y, world_z);
-                    if (id != BlockID::AIR) {
-                        gfx::Vec3f pos;
-                        pos.x = (float)world_x;
-                        pos.y = (float)y;
-                        pos.z = (float)world_z;
-                        m_positions.push_back(pos);
+        for (int y = 0; y < CHUNK_SIZE_Y; ++y) {
+            for (int z = 0; z < CHUNK_SIZE_Z; ++z) {
+                for (int x = 0; x < CHUNK_SIZE_X; ++x) {
+                    uint8_t blockID = static_cast<uint8_t>(world.get_block(x, y, z));
+
+                    if (blockID == 0) continue;
+
+                    if (y + 1 >= CHUNK_SIZE_Y || world.get_block(x, y + 1, z) == BlockID::AIR) {
+                        Chunk::addFace(vertices, indices, x, y, z, FaceDirection::TOP, vertex_offset, blockID);
+                    }
+                    if (y - 1 < 0 || world.get_block(x, y - 1, z) == BlockID::AIR) {
+                        Chunk::addFace(vertices, indices, x, y, z, FaceDirection::BOTTOM, vertex_offset, blockID);
+                    }
+                    if (z + 1 >= CHUNK_SIZE_Z || world.get_block(x, y, z + 1) == BlockID::AIR) {
+                        Chunk::addFace(vertices, indices, x, y, z, FaceDirection::SIDE_FRONT, vertex_offset, blockID);
+                    }
+                    if (z - 1 < 0 || world.get_block(x, y, z - 1) == BlockID::AIR) {
+                        Chunk::addFace(vertices, indices, x, y, z, FaceDirection::SIDE_BACK, vertex_offset, blockID);
+                    }
+                    if (x + 1 >= CHUNK_SIZE_X || world.get_block(x + 1, y, z) == BlockID::AIR) {
+                        Chunk::addFace(vertices, indices, x, y, z, FaceDirection::SIDE_RIGHT, vertex_offset, blockID);
+                    }
+                    if (x - 1 < 0 || world.get_block(x - 1, y, z) == BlockID::AIR) {
+                        Chunk::addFace(vertices, indices, x, y, z, FaceDirection::SIDE_LEFT, vertex_offset, blockID);
                     }
                 }
             }
         }
-        std::printf("[WorldRenderer] uploaded %zu instances\n", m_positions.size());
-        m_renderer.update_instances(m_positions);
+        m_renderer.update_mesh(vertices, indices);
+        std::printf("[WorldRenderer] Generated mesh with %zu vertices and %zu indices\n", vertices.size(), indices.size());
     }
 
     void WorldRenderer::draw(const float* viewProj4x4) {

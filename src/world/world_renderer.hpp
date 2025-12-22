@@ -2,12 +2,10 @@
 
 #include <vector>
 #include <cstdint>
-#include "../gfx/cube_renderer.hpp"
 #include "chunk.hpp"
 #include "world.hpp"
 
 namespace ocm {
-
     class WorldRenderer {
         public:
             WorldRenderer();
@@ -21,6 +19,5 @@ namespace ocm {
 
         private:
             gfx::CubeRenderer m_renderer;
-            std::vector<gfx::Vec3f> m_positions;
     };
 } // namespace ocm

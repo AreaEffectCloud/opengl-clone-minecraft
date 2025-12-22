@@ -5,9 +5,9 @@ namespace ocm {
 
     enum class BlockID : uint8_t {
         AIR = 0,
-        STONE = 1,
-        DIRT = 2,
-        GRASS = 3,
+        DIRT = 1,
+        GRASS = 2,
+        STONE = 3,
         LOG = 4,
         PLANKS = 5,
         LEAVES = 6,

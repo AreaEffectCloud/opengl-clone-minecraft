@@ -19,7 +19,7 @@ using namespace ocm;
 static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
 static const unsigned int POSITION_X = 400, POSITION_Y = 50;
 
-static Camera camera;
+static util::Camera camera;
 static float lastX = (float)SCR_WIDTH / 2.0f;
 static float lastY = (float)SCR_HEIGHT / 2.0f;
 static bool firstMouse = true;
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
     WorldRenderer worldrenderer;
     bool worldRendererReady = false;
     if (!worldrenderer.init()) {
-        std::fprintf(stderr, "WorldRenderer::init failed\n");
+        std::fprintf(stderr, "[main_worldgen] WorldRenderer::init failed\n");
         // 描画が動作しないが、ワールド自体は初期化済みなので続行は可能
     } else {
         worldRendererReady = true;
@@ -134,14 +134,14 @@ int main(int argc, char** argv) {
 
 
     // --- build instance list from world for debugging/verification ---
-    std::vector<gfx::Vec3f> world_blocks;
+    std::vector<gfx::ChunkVertex> world_blocks;
 
     // 16x16x16 の範囲にブロックを敷き詰める
     for (int x = 0; x < 16; ++x) {
         for (int z = 0; z < 16; ++z) {
             // 地面の高さを決める（とりあえず y=0 ～ y=2 を土、y=3 を草にする）
             for (int y = 0; y < 4; ++y) {
-                gfx::Vec3f p;
+                gfx::ChunkVertex p;
                 p.x = static_cast<float>(x);
                 p.y = static_cast<float>(y);
                 p.z = static_cast<float>(z);
@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
         }
     }
     // Rendererにアップロード
-    cubeRenderer.update_instances(world_blocks);
+    // cubeRenderer.update_mesh(world_blocks);
 
 
     // std::vector<gfx::Vec3f> instances;
@@ -255,22 +255,22 @@ void key_callback(GLFWwindow* window) {
         glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+        camera.ProcessKeyboard(util::FORWARD, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+        camera.ProcessKeyboard(util::BACKWARD, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        camera.ProcessKeyboard(LEFT, deltaTime);
+        camera.ProcessKeyboard(util::LEFT, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+        camera.ProcessKeyboard(util::RIGHT, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        camera.ProcessKeyboard(TOP, deltaTime);
+        camera.ProcessKeyboard(util::TOP, deltaTime);
     }
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-        camera.ProcessKeyboard(BOTTOM, deltaTime);
+        camera.ProcessKeyboard(util::BOTTOM, deltaTime);
     }
 }
 

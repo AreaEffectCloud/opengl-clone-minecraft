@@ -1,5 +1,4 @@
 #include "cube_renderer.hpp"
-#include "cube_mesh.hpp"
 #include "shader_utils.hpp"
 #include <cstdio>
 #include <cstring>
@@ -25,22 +24,14 @@ struct GLContext {
 
 static GLContext glContext;
 
-// Utility function to check for OpenGL errors
-void checkOpenGLError(const char* tag) {
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR) {
-        std::fprintf(stderr, "[ERROR][%s] OpenGL Error: %u\n", tag, err);
-    }
-}
-
 namespace gfx {
-
     CubeRenderer::CubeRenderer() = default;
 
     CubeRenderer::~CubeRenderer() {
-        if (m_instance_vbo) glDeleteBuffers(1, &m_instance_vbo);
+        if (m_vao) glDeleteVertexArrays(1, &m_vao);
+        if (m_vbo) glDeleteBuffers(1, &m_vbo);
+        if (m_ebo) glDeleteBuffers(1, &m_ebo);
         if (m_program) glDeleteProgram(m_program);
-        delete m_cube_mesh;
     }
 
     GLuint CubeRenderer::compile_shader(const char* source, GLenum shader_type) {
@@ -53,8 +44,8 @@ namespace gfx {
         if (!success) {
             char buf[1024];
             glGetShaderInfoLog(shader, sizeof(buf), nullptr, buf);
-            std::fprintf(stderr, "[CubeRenderer] Shader compilation error: %s", buf);
-            std::printf("[CubeRenderer] Source: %s", shader_type == GL_VERTEX_SHADER ? "Vertex Shader; " : "Fragment Shader; ");
+            std::fprintf(stderr, "\n[CubeRenderer] Shader compilation error: %s", buf);
+            std::printf("[CubeRenderer] Source: %s\n\n", shader_type == GL_VERTEX_SHADER ? "Vertex Shader; " : "Fragment Shader; ");
             glDeleteShader(shader);
             return 0;
         }
@@ -70,6 +61,7 @@ namespace gfx {
         glBindAttribLocation(program, 1, "aNormal"); // if needed in future
         glBindAttribLocation(program, 2, "aTex");
         glBindAttribLocation(program, 4, "aFaceID");
+        glBindAttribLocation(program, 5, "aBlockID");
 
         glLinkProgram(program);
 
@@ -86,7 +78,6 @@ namespace gfx {
     }
 
     bool CubeRenderer::init() {
-        m_cube_mesh = new CubeMesh();
         if (vertex_shader_path.empty() || fragment_shader_path.empty()) {
             std::fprintf(stderr, "Failed to load shader sources: %s, %s\n", vertex_shader_path.c_str(), fragment_shader_path.c_str());
             return false;
@@ -108,22 +99,15 @@ namespace gfx {
         if (!m_program) return false;
 
         // create instance VBO
-        std::printf("[CubeRenderer] Creating instance VBO and Binding VAO...\n");
-
-        glGenBuffers(1, &m_instance_vbo);
-        // bind cube VAO and enable instanced attrib
-        glBindVertexArray(m_cube_mesh->vao());
-        
-        std::printf("[CubeRenderer] Generated instance VBO: ID=%u\n", (unsigned int)m_instance_vbo);
-        std::printf("[CubeRenderer] Finished creating instance VBO and binding VAO....\n");
-        
-        glBindBuffer(GL_ARRAY_BUFFER, m_instance_vbo);
-        checkOpenGLError("After glBindBuffer for instance VBO");
+        std::printf("[CubeRenderer] Generating VAO, VBO, EBO...\n");
+        glGenVertexArrays(1, &m_vao);
+        glGenBuffers(1, &m_vbo);
+        glGenBuffers(1, &m_ebo);
+        std::printf("[CubeRenderer] Generated Chunk Buffers: VAO=%u, VBO=%u, EBO=%u\n", m_vao, m_vbo, m_ebo);
 
         // Texture Loading using stbi
         {
             glGenTextures(1, &glContext.textureID);
-            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, glContext.textureID);
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -137,67 +121,86 @@ namespace gfx {
                 GLenum format = GL_RGB;
                 if (nrChannels == 4) format = GL_RGBA;
                 glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-
                 std::printf("[CubeRenderer / Texture] Data sent GPU: Size: %dx%d, Channels: %d, \nSource: %s\n", width, height, nrChannels, texture_path);
                 glGenerateMipmap(GL_TEXTURE_2D);
-
+                stbi_image_free(data);
             } else {
                 std::printf("[CubeRenderer] Failed to load texture at path: %s\n", texture_path);
                 return false;
             }
 
-            stbi_image_free(data);
         }
-
-        // glEnableVertexAttribArray(3); // aInstancePos
-        // glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-        printf("[CubeRenderer] initialized: program=%u, cube_vao=%u\n", (unsigned)m_program, (unsigned)m_cube_mesh->vao());
-
+        // glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // glBindVertexArray(0);
         return true;
     }
 
-    void CubeRenderer::update_instances(const std::vector<Vec3f>& positions) {
-        glBindBuffer(GL_ARRAY_BUFFER, m_instance_vbo);
-        m_instances = positions;
-        if (!positions.empty()) {
-            glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(Vec3f), positions.data(), GL_STATIC_DRAW);
-        } else {
-            // keep buffer empty
-            glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
+    void CubeRenderer::update_mesh(const std::vector<ChunkVertex>& vertices, const std::vector<uint32_t>& indices) {
+        if (vertices.empty() || indices.empty()) {
+            m_index_count = 0;
+            return;
         }
+
+        m_index_count = static_cast<uint32_t>(indices.size());
+
+        // Bind and upload data
+        glBindVertexArray(m_vao);
+
+        // transfer vertex data
+        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(ChunkVertex), vertices.data(), GL_DYNAMIC_DRAW);
+
+        // transfer index data
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32_t), indices.data(), GL_DYNAMIC_DRAW);
+
+        // set vertex attribute pointers
+        GLsizei stride = sizeof(ChunkVertex);
+
+        // aPos
+        glEnableVertexAttribArray(0); // position
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+
+        // aTex
+        glEnableVertexAttribArray(2); // uv
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+
+        // aFaceID
+        glEnableVertexAttribArray(4); // face index
+        glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
+
+        glEnableVertexAttribArray(5); // block ID
+        glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+
+        // unbind VAO
+        glBindVertexArray(0);
+
+        // unbind other buffers
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        m_instance_count = static_cast<GLuint>(positions.size());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
     void CubeRenderer::draw(const float* viewProj4x4) {
-        if (!m_program || !m_cube_mesh || m_instances.empty()) return;
+        if (m_index_count == 0) return;
+
         glUseProgram(m_program);
 
         // get uniforms locations
         GLint vpLoc = glGetUniformLocation(m_program, "uViewProj");
         if (vpLoc >= 0) glUniformMatrix4fv(vpLoc, 1, GL_FALSE, viewProj4x4);
 
-        GLint posLoc = glGetUniformLocation(m_program, "uModelPos");
-        GLint blockTypeLoc = glGetUniformLocation(m_program, "uBlockType");
-        // GLint texLoc = glGetUniformLocation(m_program, "uTexIndex");
+        // GLint blockTypeLoc = glGetUniformLocation(m_program, "uBlockType");
+        // if (blockTypeLoc >= 0) glUniform1i(blockTypeLoc, 3); // default block type
 
-        glBindVertexArray(m_cube_mesh->vao());
+        // bind texture
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, glContext.textureID);
 
-        for (const auto& pos : m_instances) {
-            glUniform3f(posLoc, pos.x, pos.y, pos.z);
+        // unbind VAO and draw
+        glBindVertexArray(m_vao);
 
-            if (pos.y > 5.5f) {
-                glUniform1i(blockTypeLoc, 3);
-            } else {
-                glUniform1i(blockTypeLoc, 2);
-            }
+        glDrawElements(GL_TRIANGLES, m_index_count, GL_UNSIGNED_INT, 0);
 
-            // Draw call for single instance
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (void*)0);
-        }
         glBindVertexArray(0);
         glUseProgram(0);
     }

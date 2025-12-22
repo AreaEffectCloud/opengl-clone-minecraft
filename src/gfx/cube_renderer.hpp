@@ -3,10 +3,14 @@
 #include <vector>
 #include <cstdint>
 #include <glad/glad.h>
-#include "cube_mesh.hpp"
 
 namespace gfx {
-    struct Vec3f { float x, y, z; };
+    struct ChunkVertex { 
+        float x, y, z; 
+        float u, v; 
+        float faceID;
+        float blockID;
+    };
 
     class CubeRenderer {
         public:
@@ -15,18 +19,22 @@ namespace gfx {
 
             bool init();
 
-            void update_instances(const std::vector<Vec3f>& positions);
+            // 構築されたメッシュをGPUに転送
+            void update_mesh(const std::vector<ChunkVertex>& vertices, const std::vector<uint32_t>& indices);
 
             void draw(const float* viewProj4x4);
 
-            GLuint program() const noexcept { return m_program; }
+            GLuint program() const noexcept { return m_program; };
 
         private:
             GLuint m_program = 0;
-            GLuint m_instance_vbo = 0;
-            GLuint m_instance_count = 0;
-            gfx::CubeMesh* m_cube_mesh = nullptr;
-            std::vector<Vec3f> m_instances;
+            GLuint m_vao = 0;
+            GLuint m_vbo = 0;
+            GLuint m_ebo = 0;
+            uint32_t m_index_count = 0;
+
+            // GLuint m_instance_vbo = 0;
+            // GLuint m_instance_count = 0;
 
             GLuint compile_shader(const char* source, GLenum shader_type);
             GLuint link_program(GLuint vertex_shader, GLuint fragment_shader);

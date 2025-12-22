@@ -20,7 +20,7 @@ namespace ocm {
             void generate_chunk(int cx, int cz);
             void generate_world(int width, int depth);
     
-            BlockID get_block(int world_x, int world_y, int world_z) const;
+            BlockID get_block(int wx, int wy, int wz) const;
     
             int sample_height(int world_x, int world_z) const;
             void dump_stats() const;

@@ -35,16 +35,16 @@ namespace ocm {
                             if (y - 1 < 0 || world.get_block(wx, y - 1, wz) == BlockID::AIR) {
                                 Chunk::addFace(vertices, indices, wx, y, wz, FaceDirection::BOTTOM, vertex_offset, blockID);
                             }
-                            if (z + 1 >= CHUNK_SIZE_Z || world.get_block(wx, y, wz + 1) == BlockID::AIR) {
+                            if (world.get_block(wx, y, wz + 1) == BlockID::AIR) {
                                 Chunk::addFace(vertices, indices, wx, y, wz, FaceDirection::SIDE_FRONT, vertex_offset, blockID);
                             }
-                            if (z - 1 < 0 || world.get_block(wx, y, wz - 1) == BlockID::AIR) {
+                            if (world.get_block(wx, y, wz - 1) == BlockID::AIR) {
                                 Chunk::addFace(vertices, indices, wx, y, wz, FaceDirection::SIDE_BACK, vertex_offset, blockID);
                             }
-                            if (x + 1 >= CHUNK_SIZE_X || world.get_block(wx + 1, y, wz) == BlockID::AIR) {
+                            if (world.get_block(wx + 1, y, wz) == BlockID::AIR) {
                                 Chunk::addFace(vertices, indices, wx, y, wz, FaceDirection::SIDE_RIGHT, vertex_offset, blockID);
                             }
-                            if (x - 1 < 0 || world.get_block(wx - 1, y, wz) == BlockID::AIR) {
+                            if (world.get_block(wx - 1, y, wz) == BlockID::AIR) {
                                 Chunk::addFace(vertices, indices, wx, y, wz, FaceDirection::SIDE_LEFT, vertex_offset, blockID);
                             }
                         }

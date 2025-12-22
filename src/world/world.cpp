@@ -155,21 +155,21 @@ namespace ocm {
         return std::min(std::max(height, 0), CHUNK_SIZE_Y - 1);
     }
     
-    BlockID World::get_block(int world_x, int world_y, int world_z) const {
-        if (world_y < 0 || world_y >= CHUNK_SIZE_Y) return BlockID::AIR;
+    BlockID World::get_block(int wx, int wy, int wz) const {
+        if (wy < 0 || wy >= CHUNK_SIZE_Y) return BlockID::AIR;
 
         // ワールド座標からチャンク座標 (cx, cz) を計算
         // 正の座標系を想定しているが、負の座標も考慮する場合はfloorを使う
-        int cx = world_x >= 0 ? world_x / CHUNK_SIZE_X : (world_x + 1) / CHUNK_SIZE_X - 1;
-        int cz = world_z >= 0 ? world_z / CHUNK_SIZE_Z : (world_z + 1) / CHUNK_SIZE_Z - 1;
+        int cx = wx >= 0 ? wx / CHUNK_SIZE_X : (wx + 1) / CHUNK_SIZE_X - 1;
+        int cz = wz >= 0 ? wz / CHUNK_SIZE_Z : (wz + 1) / CHUNK_SIZE_Z - 1;
 
         // チャンク内ローカル座標を計算
-        int lx = world_x - (cx * CHUNK_SIZE_X);
-        int lz = world_z - (cz * CHUNK_SIZE_Z);
+        int lx = wx - (cx * CHUNK_SIZE_X);
+        int lz = wz - (cz * CHUNK_SIZE_Z);
 
         auto it = m_chunks.find({cx, cz});
         if (it != m_chunks.end()) {
-            return static_cast<BlockID>(it->second->get_block(lx, world_y, lz));
+            return static_cast<BlockID>(it->second->get_block(lx, wy, lz));
         }
         return BlockID::AIR;
     }

@@ -1,9 +1,13 @@
 #pragma once
 
-#include "../gfx/cube_renderer.hpp"
 #include <cstdint>
 #include <vector>
 #include <memory>
+
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+#include "../gfx/vertex.hpp"
 
 namespace ocm {
     enum FaceDirection {
@@ -23,6 +27,15 @@ namespace ocm {
         public:
             Chunk(int cx, int cz);
             ~Chunk();
+
+            // Draw call 用の OpenGL リソース
+            GLuint vao = 0;
+            GLuint vbo = 0;
+            GLuint ebo = 0;
+            uint32_t indexCount = 0;
+            bool isDirty = true; // メッシュが更新されているかどうか
+
+            void destroy_gl_resources(); // OpenGL リソースの解放
     
             int cx() const noexcept { return m_cx; }
             int cz() const noexcept { return m_cz; }
@@ -30,7 +43,7 @@ namespace ocm {
             uint8_t get_block(int x, int y, int z) const noexcept;
             void set_block(int x, int y, int z, uint8_t id) noexcept;
 
-            static void addFace(
+            static void add_face(
                 std::vector<gfx::ChunkVertex>& vertices, 
                 std::vector<uint32_t>& indices, 
                 int x, int y, int z, 

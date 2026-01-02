@@ -17,7 +17,7 @@
 using namespace ocm;
 
 static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
-static const unsigned int POSITION_X = 400, POSITION_Y = 50;
+static const unsigned int POSITION_X = 400, POSITION_Y = 40;
 
 static util::Camera camera;
 static float lastX = (float)SCR_WIDTH / 2.0f;
@@ -83,19 +83,6 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    // texture
-    glEnable(GL_FRAMEBUFFER_SRGB);
-    glDisable(0x809D); // disable multisampling
-
-    // depth and face culling
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    
-    // culling
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW); // define front side as counter clockwise
-
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glViewport(0, 0, (int)SCR_WIDTH, (int)SCR_HEIGHT);
 
@@ -112,20 +99,6 @@ int main(int argc, char** argv) {
         // 描画が動作しないが、ワールド自体は初期化済みなので続行は可能
     } else {
         worldRendererReady = true;
-    }
-
-    gfx::CubeRenderer cubeRenderer;
-    bool cubeRendererReady = false;
-    if (!cubeRenderer.init()) {
-        std::fprintf(stderr, "CubeRenderer::init failed\n");
-    } else {
-        cubeRendererReady = true;
-    }
-    
-    if (worldRendererReady) {
-        std::printf("[main] Uploading combined 16-chunk mesh to GPU...\n");
-        worldrenderer.upload_world(world);
-        std::printf("[main] Upload complete.\n");
     }
 
     // --- position camera to look at the center of the spawn chunk ---
@@ -151,27 +124,21 @@ int main(int argc, char** argv) {
     }
 
     while(!glfwWindowShouldClose(window)) {
-        float currentFrame = (float)glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
+        // float currentFrame = (float)glfwGetTime();
+        // deltaTime = currentFrame - lastFrame;
+        // lastFrame = currentFrame;
         key_callback(window);
+
+        world.update(camera.Position.x, camera.Position.z, 2); // 描画距離4チャンク
+
         glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
+
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
         glm::mat4 viewProj = projection * view;
 
-        if (worldRendererReady)
-            worldrenderer.draw(glm::value_ptr(viewProj), camera.Position);
-        else if (cubeRendererReady)
-            cubeRenderer.draw(glm::value_ptr(viewProj), camera.Position);
-
-        GLenum err = glGetError();
-        if (err != GL_NO_ERROR) {
-            std::fprintf(stderr, "OpenGL error: 0x%X\n", err);
-        }
+        worldrenderer.render(world, camera.Position, viewProj, 2);
     
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -235,6 +202,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.Zoom -= (float)yoffset;
     if (camera.Zoom < 1.0f)
         camera.Zoom = 1.0f;
-    if (camera.Zoom > 45.0f)
-        camera.Zoom = 45.0f;
+    if (camera.Zoom > 130.0f)
+        camera.Zoom = 130.0f;
 }

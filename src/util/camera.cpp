@@ -56,7 +56,7 @@ namespace util {
         // Zoom は FOV（度）として扱う。適当な範囲にクランプする
         Zoom -= yoffset;
         if (Zoom < 1.0f) Zoom = 1.0f;
-        if (Zoom > 90.0f) Zoom = 90.0f;
+        if (Zoom > 130.0f) Zoom = 130.0f;
     }
     
     void Camera::updateCameraVectors() {

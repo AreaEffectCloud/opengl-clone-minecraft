@@ -98,7 +98,7 @@ namespace ocm {
     }
 
     void World::generate_chunk(int cx, int cz) {
-        // 複数のチャンクを管理する場合、m_spawn_chunk ではなく 
+        // 複数のチャンクを管理する場合、 
         // std::map<std::pair<int, int>, ChunkPtr> m_chunks 等での管理が理想です
         auto chunk = std::make_unique<Chunk>(cx, cz);
 
@@ -142,19 +142,6 @@ namespace ocm {
         }
     }
 
-    int World::sample_height(int world_x, int world_z) const {
-        float noise_val = fractal_noise(
-            world_x * 0.03f,
-            world_z * 0.03f,
-            4,      // octaves
-            0.5f,   // persistence
-            2.0f    // lacunarity
-        );
-
-        int height = static_cast<int>(noise_val * (CHUNK_SIZE_Y - 1)) + 1;
-        return std::min(std::max(height, 0), CHUNK_SIZE_Y - 1);
-    }
-    
     BlockID World::get_block(int wx, int wy, int wz) const {
         if (wy < 0 || wy >= CHUNK_SIZE_Y) return BlockID::AIR;
 
@@ -174,6 +161,19 @@ namespace ocm {
         return BlockID::AIR;
     }
 
+    int World::sample_height(int world_x, int world_z) const {
+        float noise_val = fractal_noise(
+            world_x * 0.03f,
+            world_z * 0.03f,
+            4,      // octaves
+            0.5f,   // persistence
+            2.0f    // lacunarity
+        );
+
+        int height = static_cast<int>(noise_val * (CHUNK_SIZE_Y - 1)) + 1;
+        return std::min(std::max(height, 0), CHUNK_SIZE_Y - 1);
+    }
+    
     void World::dump_stats() const {
         if (m_chunks.empty()) {
             std::puts("[World] no chunks generated.\n");
@@ -210,5 +210,51 @@ namespace ocm {
         std::printf("---------------------------\n");
         std::printf("Global Height Range: [%d - %d]\n", total_min_h, total_max_h);
         std::printf("---------------------------\n");
+    }
+
+    bool World::has_chunk(int cx, int cz) const {
+        return m_chunks.find({cx, cz}) != m_chunks.end();
+    }
+
+    void World::update(float playerX, float playerZ, int viewDistance) {
+        // プレイヤーが今どのチャンクにいるか
+        int pCX = static_cast<int>(std::floor(playerX / static_cast<float>(CHUNK_SIZE_X)));
+        int pCZ = static_cast<int>(std::floor(playerZ / static_cast<float>(CHUNK_SIZE_Z)));
+
+        bool chunkGenerated = false;
+
+        // プレイヤーの周囲 (viewDistance) のチャンクをチェック
+        for (int cz = pCZ - viewDistance; cz <= pCZ + viewDistance; cz++) {
+            for (int cx = pCX - viewDistance; cx <= pCX + viewDistance; cx++) {
+
+                // generate chunk if not exists
+                auto it = m_chunks.find({cx, cz});
+                if (it == m_chunks.end()) {
+                    generate_chunk(cx, cz);
+                    chunkGenerated = true;
+                    std::printf("[World] Generated chunk (%d, %d)\n", cx, cz);
+                }
+            }
+        }
+        if (chunkGenerated) {
+            m_needsMeshUpdate = true;
+        }
+    }
+
+    std::vector<Chunk*> World::get_visible_chunks(const glm::vec3& camPos, int viewDistance) {
+        std::vector<Chunk*> visibleChunks;
+
+        int pCX = static_cast<int>(std::floor(camPos.x / static_cast<float>(CHUNK_SIZE_X)));
+        int pCZ = static_cast<int>(std::floor(camPos.z / static_cast<float>(CHUNK_SIZE_Z)));
+
+        for (int cz = pCZ - viewDistance; cz <= pCZ + viewDistance; cz++) {
+            for (int cx = pCX - viewDistance; cx <= pCX + viewDistance; cx++) {
+                auto it = m_chunks.find({cx, cz});
+                if (it != m_chunks.end()) {
+                    visibleChunks.push_back(it->second.get());
+                }
+            }
+        }
+        return visibleChunks;
     }
 } // namespace ocm

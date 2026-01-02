@@ -6,7 +6,18 @@ namespace ocm {
         : m_cx(cx), m_cz(cz), m_blocks(static_cast<size_t>(CHUNK_SIZE_X) * CHUNK_SIZE_Y * CHUNK_SIZE_Z, 0) {
     }
     
-    Chunk::~Chunk() = default;
+    Chunk::~Chunk() {
+        destroy_gl_resources();
+    };
+
+    void Chunk::destroy_gl_resources() {
+        if (vao != 0) {
+            glDeleteVertexArrays(1, &vao);
+            glDeleteBuffers(1, &vbo);
+            glDeleteBuffers(1, &ebo);
+            vao = vbo = ebo = 0;
+        }
+    }
 
     uint8_t Chunk::get_block(int x, int y, int z) const noexcept {
         if (x < 0 || x >= CHUNK_SIZE_X || y < 0 || y >= CHUNK_SIZE_Y || z < 0 || z >= CHUNK_SIZE_Z) return 0; // AIR
@@ -16,9 +27,10 @@ namespace ocm {
     void Chunk::set_block(int x, int y, int z, uint8_t id) noexcept {
         if (x < 0 || x >= CHUNK_SIZE_X || y < 0 || y >= CHUNK_SIZE_Y || z < 0 || z >= CHUNK_SIZE_Z) return;
         m_blocks[index(x, y, z)] = id;
+        isDirty = true;
     }
 
-    void Chunk::addFace(
+    void Chunk::add_face(
         std::vector<gfx::ChunkVertex>& vertices, 
         std::vector<uint32_t>& indices, 
         int x, int y, int z, 
@@ -31,49 +43,46 @@ namespace ocm {
         float fz = static_cast<float>(z);
 
         // Determine the faceID
-        float fID = 0.0f;
-        if (dir == TOP) fID = 1.0f;
-        else if (dir == BOTTOM) fID = 2.0f;
-
+        float fID = static_cast<float>(dir);
         float fBlockID = static_cast<float>(blockID);
 
         // Define the 4 vertices for each face based on direction
         switch (dir) {
-            case SIDE_FRONT: // Z+
-                vertices.push_back({fx - 0.5f, fy - 0.5f, fz + 0.5f, 0.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy - 0.5f, fz + 0.5f, 1.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy + 0.5f, fz + 0.5f, 1.0f, 1.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy + 0.5f, fz + 0.5f, 0.0f, 1.0f, fID, fBlockID});
-                break;
-            case SIDE_BACK: // Z-
-                vertices.push_back({fx + 0.5f, fy - 0.5f, fz - 0.5f, 0.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy - 0.5f, fz - 0.5f, 1.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy + 0.5f, fz - 0.5f, 1.0f, 1.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy + 0.5f, fz - 0.5f, 0.0f, 1.0f, fID, fBlockID});
-                break;
             case TOP: // Y+
-                vertices.push_back({fx - 0.5f, fy + 0.5f, fz + 0.5f, 0.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy + 0.5f, fz + 0.5f, 1.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy + 0.5f, fz - 0.5f, 1.0f, 1.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy + 0.5f, fz - 0.5f, 0.0f, 1.0f, fID, fBlockID});
+                vertices.push_back({fx,   fy+1, fz+1, 0, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy+1, fz+1, 1, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy+1, fz,   1, 1, fID, fBlockID});
+                vertices.push_back({fx,   fy+1, fz,   0, 1, fID, fBlockID});
                 break;
             case BOTTOM: // Y-
-                vertices.push_back({fx - 0.5f, fy - 0.5f, fz - 0.5f, 0.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy - 0.5f, fz - 0.5f, 1.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy - 0.5f, fz + 0.5f, 1.0f, 1.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy - 0.5f, fz + 0.5f, 0.0f, 1.0f, fID, fBlockID});
+                vertices.push_back({fx,   fy, fz,   0, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy, fz,   1, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy, fz+1, 1, 1, fID, fBlockID});
+                vertices.push_back({fx,   fy, fz+1, 0, 1, fID, fBlockID});
+                break;
+            case SIDE_FRONT: // Z+
+                vertices.push_back({fx,   fy,   fz+1, 0, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy,   fz+1, 1, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy+1, fz+1, 1, 1, fID, fBlockID});
+                vertices.push_back({fx,   fy+1, fz+1, 0, 1, fID, fBlockID});
+                break;
+            case SIDE_BACK: // Z-
+                vertices.push_back({fx+1, fy,   fz,   0, 0, fID, fBlockID});
+                vertices.push_back({fx,   fy,   fz,   1, 0, fID, fBlockID});
+                vertices.push_back({fx,   fy+1, fz,   1, 1, fID, fBlockID});
+                vertices.push_back({fx+1, fy+1, fz,   0, 1, fID, fBlockID});
                 break;
             case SIDE_RIGHT: // X+
-                vertices.push_back({fx + 0.5f, fy - 0.5f, fz + 0.5f, 0.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy - 0.5f, fz - 0.5f, 1.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy + 0.5f, fz - 0.5f, 1.0f, 1.0f, fID, fBlockID});
-                vertices.push_back({fx + 0.5f, fy + 0.5f, fz + 0.5f, 0.0f, 1.0f, fID, fBlockID});
+                vertices.push_back({fx+1, fy,   fz+1, 0, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy,   fz,   1, 0, fID, fBlockID});
+                vertices.push_back({fx+1, fy+1, fz,   1, 1, fID, fBlockID});
+                vertices.push_back({fx+1, fy+1, fz+1, 0, 1, fID, fBlockID});
                 break;
             case SIDE_LEFT: // X-
-                vertices.push_back({fx - 0.5f, fy - 0.5f, fz - 0.5f, 0.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy - 0.5f, fz + 0.5f, 1.0f, 0.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy + 0.5f, fz + 0.5f, 1.0f, 1.0f, fID, fBlockID});
-                vertices.push_back({fx - 0.5f, fy + 0.5f, fz - 0.5f, 0.0f, 1.0f, fID, fBlockID});
+                vertices.push_back({fx,   fy,   fz,   0, 0, fID, fBlockID});
+                vertices.push_back({fx,   fy,   fz+1, 1, 0, fID, fBlockID});
+                vertices.push_back({fx,   fy+1, fz+1, 1, 1, fID, fBlockID});
+                vertices.push_back({fx,   fy+1, fz,   0, 1, fID, fBlockID});
                 break;
         }
 

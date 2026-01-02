@@ -7,14 +7,15 @@ in float aBlockID;
 
 uniform mat4 uViewProj;
 uniform vec3 uViewPos;
+uniform vec3 uChunkPos;
 
 out vec2 vTex;
 out float vDist;
 
 void main() {
-    gl_Position = uViewProj * vec4(aPos, 1.0);
-
-    vDist = distance(aPos, uViewPos);
+    vec3 worldPos = aPos + uChunkPos;
+    gl_Position = uViewProj * vec4(worldPos, 1.0);
+    vDist = distance(worldPos, uViewPos);
 
     int type = int(aBlockID);
     int texIndex = 0;

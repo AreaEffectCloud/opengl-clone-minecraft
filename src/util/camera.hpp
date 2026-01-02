@@ -15,9 +15,9 @@ namespace util {
 
     constexpr float CAMERA_YAW         = -90.0f;
     constexpr float CAMERA_PITCH       =  0.0f;
-    constexpr float CAMERA_SPEED       =  2.5f;
-    constexpr float CAMERA_SENSITIVITY =  0.1f;
-    constexpr float CAMERA_ZOOM        =  45.0f;
+    constexpr float CAMERA_SPEED       =  5.0f;
+    constexpr float CAMERA_SENSITIVITY =  0.05f;
+    constexpr float CAMERA_ZOOM        =  130.0f;
     
     class Camera {
         public:

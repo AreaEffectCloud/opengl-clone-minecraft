@@ -37,29 +37,30 @@ namespace ocm {
         for (int y = 0; y < CHUNK_SIZE_Y; y++) {
             for (int z = 0; z < CHUNK_SIZE_Z; z++) {
                 for (int x = 0; x < CHUNK_SIZE_X; x++) {
+                    
+                    uint8_t blockID = chunk.get_block(x, y, z);
+                    if (blockID == 0) continue;
 
                     int wx = cx * CHUNK_SIZE_X + x;
+                    int wy = y;
                     int wz = cz * CHUNK_SIZE_Z + z;
-
-                    uint8_t blockID = static_cast<uint8_t>(world.get_block(wx, y, wz));
-                    if (blockID == 0) continue;
     
-                    if (y + 1 >= CHUNK_SIZE_Y || world.get_block(wx, y + 1, wz) == BlockID::AIR) {
+                    if (!world.is_opaque(wx, wy + 1, wz)) {
                         Chunk::add_face(vertices, indices, x, y, z, FaceDirection::TOP, vertex_offset, blockID);
                     }
-                    if (y - 1 < 0 || world.get_block(wx, y - 1, wz) == BlockID::AIR) {
+                    if (wy > 0 && !world.is_opaque(wx, wy - 1, wz)) {
                         Chunk::add_face(vertices, indices, x, y, z, FaceDirection::BOTTOM, vertex_offset, blockID);
                     }
-                    if (world.get_block(wx, y, wz + 1) == BlockID::AIR) {
+                    if (!world.is_opaque(wx, wy, wz + 1)) {
                         Chunk::add_face(vertices, indices, x, y, z, FaceDirection::SIDE_FRONT, vertex_offset, blockID);
                     }
-                    if (world.get_block(wx, y, wz - 1) == BlockID::AIR) {
+                    if (!world.is_opaque(wx, wy, wz - 1)) {
                         Chunk::add_face(vertices, indices, x, y, z, FaceDirection::SIDE_BACK, vertex_offset, blockID);
                     }
-                    if (world.get_block(wx + 1, y, wz) == BlockID::AIR) {
+                    if (!world.is_opaque(wx + 1, wy, wz)) {
                         Chunk::add_face(vertices, indices, x, y, z, FaceDirection::SIDE_RIGHT, vertex_offset, blockID);
                     }
-                    if (world.get_block(wx - 1, y, wz) == BlockID::AIR) {
+                    if (!world.is_opaque(wx - 1, wy, wz)) {
                         Chunk::add_face(vertices, indices, x, y, z, FaceDirection::SIDE_LEFT, vertex_offset, blockID);
                     }
                 }

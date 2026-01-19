@@ -1,5 +1,4 @@
 #pragma once
-
 namespace gfx {
     struct ChunkVertex { 
         float x, y, z;

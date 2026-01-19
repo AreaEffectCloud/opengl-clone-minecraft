@@ -30,9 +30,11 @@ namespace gfx {
             void draw_chunk(const ocm::Chunk& chunk);
 
             GLuint program() const noexcept { return m_program; };
+            GLuint textureArray() const noexcept { return m_textureArray; };
 
         private:
             GLuint m_program = 0;
+            GLuint m_textureArray = 0;
             GLuint compile_shader(const char* source, GLenum shader_type);
             GLuint link_program(GLuint vertex_shader, GLuint fragment_shader);
     };

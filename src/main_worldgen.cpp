@@ -30,7 +30,7 @@ static float lastFrame = 0.0f;
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 static void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-static void key_callback(GLFWwindow* window);
+static void processInput(GLFWwindow* window);
 
 int main(int argc, char** argv) {
     std::printf("\nRunning the program... \n\n[main_worldgen] Starting world generation\n");
@@ -57,8 +57,8 @@ int main(int argc, char** argv) {
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_ANY_PROFILE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
 
     glfwWindowHint(GLFW_POSITION_X, POSITION_X);
@@ -124,10 +124,10 @@ int main(int argc, char** argv) {
     }
 
     while(!glfwWindowShouldClose(window)) {
-        // float currentFrame = (float)glfwGetTime();
-        // deltaTime = currentFrame - lastFrame;
-        // lastFrame = currentFrame;
-        key_callback(window);
+        float currentFrame = (float)glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+        processInput(window);
 
         world.update(camera.Position.x, camera.Position.z, 2); // 描画距離4チャンク
 
@@ -156,7 +156,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-void key_callback(GLFWwindow* window) {
+void processInput(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 

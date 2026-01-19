@@ -39,6 +39,8 @@ namespace ocm {
             void update(float playerX, float playerZ, int viewDistance);
 
             std::vector<Chunk*> get_visible_chunks(const glm::vec3& camPos, int viewDistance);
+
+            bool is_opaque(int wx, int wy, int wz) const;
     
         private:
             uint32_t m_seed = 0;

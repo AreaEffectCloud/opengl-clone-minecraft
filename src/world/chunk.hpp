@@ -35,6 +35,16 @@ namespace ocm {
             uint32_t indexCount = 0;
             bool isDirty = true; // メッシュが更新されているかどうか
 
+            bool set_dirty(bool dirty) noexcept {
+                bool old = isDirty;
+                isDirty = dirty;
+                return old;
+            }
+
+            bool is_dirty() const noexcept {
+                return isDirty;
+            }
+
             void destroy_gl_resources(); // OpenGL リソースの解放
     
             int cx() const noexcept { return m_cx; }
@@ -59,6 +69,7 @@ namespace ocm {
         private:
             int m_cx, m_cz;
             std::vector<uint8_t> m_blocks;
+            bool m_dirty;
     
             static inline size_t index(int x, int y, int z) noexcept {
                 return static_cast<size_t>(x + CHUNK_SIZE_X * (z + CHUNK_SIZE_Z * y));

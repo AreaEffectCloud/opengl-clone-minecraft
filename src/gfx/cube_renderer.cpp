@@ -15,21 +15,25 @@ std::string fragment_shader_path = "../src/assets/shader/fragment_shader.glsl";
 std::string vertex_shader_source = loadShaderSourceFromFile(vertex_shader_path);
 std::string fragment_shader_source = loadShaderSourceFromFile(fragment_shader_path);
 
-// Texture Atlas
-const char* texture_path = "../src/assets/textures/texture_atlas.png";
-
-struct GLContext {
-    GLuint programID;
-    GLuint textureID;
+// Textures
+std::vector<std::string> texturePaths = {
+    "../src/assets/textures/block_placeholder.png",
+    "../src/assets/textures/dirt.png",
+    "../src/assets/textures/grass_block_top.png",
+    "../src/assets/textures/grass_block_side.png",
+    "../src/assets/textures/sand.png",
+    "../src/assets/textures/stone.png",
+    "../src/assets/textures/cobblestone.png",
+    "../src/assets/textures/coal_ore.png",
+    "../src/assets/textures/iron_ore.png",
 };
-
-static GLContext glContext;
 
 namespace gfx {
     CubeRenderer::CubeRenderer() = default;
 
     CubeRenderer::~CubeRenderer() {
         if (m_program) glDeleteProgram(m_program);
+        if (m_textureArray) glDeleteTextures(1, &m_textureArray);
     }
 
     GLuint CubeRenderer::compile_shader(const char* source, GLenum shader_type) {
@@ -99,28 +103,41 @@ namespace gfx {
 
         // Texture Loading using stbi
         {
-            glGenTextures(1, &glContext.textureID);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, glContext.textureID);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glGenTextures(1, &m_textureArray);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, m_textureArray);
 
             int width, height, nrChannels;
-            unsigned char* data = stbi_load(texture_path, &width, &height, &nrChannels, 0);
+            unsigned char* data = stbi_load(texturePaths[0].c_str(), &width, &height, &nrChannels, 4);
             if (data) {
-                GLenum format = GL_RGB;
-                if (nrChannels == 4) format = GL_RGBA;
-                glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-                std::printf("[CubeRenderer / Texture] Data sent GPU: Size: %dx%d, Channels: %d, \nSource: %s\n", width, height, nrChannels, texture_path);
-                glGenerateMipmap(GL_TEXTURE_2D);
+                // glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                // glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+                std::printf("[CubeRenderer / Texture] Data sent GPU: Size: %dx%d, Channels: %d, \nSource: %s\n", width, height, nrChannels, texturePaths[0].c_str());
                 stbi_image_free(data);
             } else {
-                std::printf("[CubeRenderer] Failed to load texture at path: %s\n", texture_path);
+                std::printf("[CubeRenderer] Failed to load texture at path: %s\n", texturePaths[0].c_str());
                 return false;
             }
+
+            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, static_cast<GLsizei>(texturePaths.size()), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+            for (size_t i = 0; i < texturePaths.size(); i++) {
+                unsigned char* subData = stbi_load(texturePaths[i].c_str(), &width, &height, &nrChannels, 4);
+                if (subData) {
+                    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, subData);
+                    stbi_image_free(subData);
+                } else {
+                    std::printf("[CubeRenderer] Failed to load texture at path: %s\n", texturePaths[i].c_str());
+                    return false;
+                }
+            }
+
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
         }
 
         if (m_program == 0) {
@@ -128,8 +145,6 @@ namespace gfx {
             return false;
         }
 
-        // glBindBuffer(GL_ARRAY_BUFFER, 0);
-        // glBindVertexArray(0);
         return true;
     }
 
@@ -146,32 +161,29 @@ namespace gfx {
 
         // set fog uniforms
         glUniform3f(glGetUniformLocation(m_program, "uFogColor"), 0.53f, 0.81f, 0.92f);
-        glUniform1f(glGetUniformLocation(m_program, "uFogNear"), 150.0f); // start distance
-        glUniform1f(glGetUniformLocation(m_program, "uFogFar"), 200.0f); // end distance
+        glUniform1f(glGetUniformLocation(m_program, "uFogNear"), 200.0f); // start distance
+        glUniform1f(glGetUniformLocation(m_program, "uFogFar"), 300.0f); // end distance
+
+        glm::vec3 sunDir = glm::normalize(glm::vec3(0.4f, 1.0f, 0.5f));
+        glUniform3fv(glGetUniformLocation(m_program, "uSunDir"), 1, &sunDir[0]);
 
         // bind texture
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, glContext.textureID);
-        glUniform1i(glGetUniformLocation(m_program, "uTexture"), 0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_textureArray);
+        glUniform1i(glGetUniformLocation(m_program, "uTextureArray"), 0);
 
         // texture
-        glEnable(GL_FRAMEBUFFER_SRGB);
-        glDisable(0x809D); // disable multisampling
-
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_DEPTH_TEST);
+        // glEnable(GL_FRAMEBUFFER_SRGB);
+        // glDisable(0x809D); // disable multisampling
 
         // depth and face culling
-        // glEnable(GL_DEPTH_TEST);
-        // glDepthFunc(GL_LESS);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
         
         // culling
-        // glEnable(GL_CULL_FACE);
-        // glCullFace(GL_BACK);
-        // glFrontFace(GL_CCW); // define front side as counter clockwise
-
-        // glBindVertexArray(0);
-        glUseProgram(0);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW); // define front side as counter clockwise
     }
 
     void CubeRenderer::update_chunk_mesh(
@@ -197,28 +209,24 @@ namespace gfx {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32_t), indices.data(), GL_STATIC_DRAW);
 
         // set vertex attribute pointers
-        GLsizei stride = 28;
+        GLsizei stride = sizeof(ChunkVertex);
 
         // aPos
         glEnableVertexAttribArray(0); // position
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, x));
         // aTex
         glEnableVertexAttribArray(1); // uv
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)12);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, u));
         // aFaceID
         glEnableVertexAttribArray(2); // face index
-        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)20);
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, faceID));
         // aBlockID
         glEnableVertexAttribArray(3); // block ID
-        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)24);
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, blockID));
 
         chunk.indexCount = static_cast<uint32_t>(indices.size());
         // unbind VAO
         glBindVertexArray(0);
-
-        // unbind other buffers
-        // glBindBuffer(GL_ARRAY_BUFFER, 0);
-        // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
     void CubeRenderer::draw_chunk(const ocm::Chunk& chunk) {

@@ -221,24 +221,30 @@ namespace ocm {
         int pCX = static_cast<int>(std::floor(playerX / static_cast<float>(CHUNK_SIZE_X)));
         int pCZ = static_cast<int>(std::floor(playerZ / static_cast<float>(CHUNK_SIZE_Z)));
 
-        bool chunkGenerated = false;
+        // bool chunkGenerated = false;
 
         // プレイヤーの周囲 (viewDistance) のチャンクをチェック
         for (int cz = pCZ - viewDistance; cz <= pCZ + viewDistance; cz++) {
             for (int cx = pCX - viewDistance; cx <= pCX + viewDistance; cx++) {
-
-                // generate chunk if not exists
-                auto it = m_chunks.find({cx, cz});
-                if (it == m_chunks.end()) {
+                if (!has_chunk(cx, cz)) {
                     generate_chunk(cx, cz);
-                    chunkGenerated = true;
+                    // chunkGenerated = true;
                     std::printf("[World] Generated chunk (%d, %d)\n", cx, cz);
+
+                    m_chunks[{cx, cz}]->set_dirty(true);
+
+                    if (has_chunk(cx + 1, cz)) m_chunks[{cx + 1, cz}]->set_dirty(true);
+                    if (has_chunk(cx - 1, cz)) m_chunks[{cx - 1, cz}]->set_dirty(true);
+                    if (has_chunk(cx, cz + 1)) m_chunks[{cx, cz + 1}]->set_dirty(true);
+                    if (has_chunk(cx, cz - 1)) m_chunks[{cx, cz - 1}]->set_dirty(true);
+
+                    m_needsMeshUpdate = true;
                 }
             }
         }
-        if (chunkGenerated) {
-            m_needsMeshUpdate = true;
-        }
+        // if (chunkGenerated) {
+        //     m_needsMeshUpdate = true;
+        // }
     }
 
     std::vector<Chunk*> World::get_visible_chunks(const glm::vec3& camPos, int viewDistance) {
@@ -256,5 +262,10 @@ namespace ocm {
             }
         }
         return visibleChunks;
+    }
+
+    bool World::is_opaque(int wx, int wy, int wz) const {
+        // Return true if the block at (wx, wy, wz) is not AIR
+        return get_block(wx, wy, wz) != BlockID::AIR;
     }
 } // namespace ocm

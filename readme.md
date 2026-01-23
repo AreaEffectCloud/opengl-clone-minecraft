@@ -31,3 +31,9 @@ I've made the voxel game like Minecraft on C++.
   - world_renderer
   - world
 - main_worldgen.cpp
+
+## Compile
+Move to the `bin` directory and run it.
+```bash
+mingw32-make.exe ; .\game.exe
+```

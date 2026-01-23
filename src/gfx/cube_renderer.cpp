@@ -110,8 +110,6 @@ namespace gfx {
             int width, height, nrChannels;
             unsigned char* data = stbi_load(texturePaths[0].c_str(), &width, &height, &nrChannels, 4);
             if (data) {
-                // glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-                // glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
                 std::printf("[CubeRenderer / Texture] Data sent GPU: Size: %dx%d, Channels: %d, \nSource: %s\n", width, height, nrChannels, texturePaths[0].c_str());
                 stbi_image_free(data);
             } else {

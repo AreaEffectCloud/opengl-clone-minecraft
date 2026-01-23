@@ -16,8 +16,10 @@
 
 using namespace ocm;
 
-static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
-static const unsigned int POSITION_X = 400, POSITION_Y = 40;
+static const unsigned int SCR_WIDTH = 1920, SCR_HEIGHT = 1090;
+static const unsigned int POSITION_X = 0, POSITION_Y = 40;
+
+static const int viewDistance = 4; // viewDistance * 2 chunks
 
 static util::Camera camera;
 static float lastX = (float)SCR_WIDTH / 2.0f;
@@ -129,7 +131,7 @@ int main(int argc, char** argv) {
         lastFrame = currentFrame;
         processInput(window);
 
-        world.update(camera.Position.x, camera.Position.z, 2); // 描画距離4チャンク
+        world.update(camera.Position.x, camera.Position.z, viewDistance);
 
         glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -138,7 +140,7 @@ int main(int argc, char** argv) {
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
         glm::mat4 viewProj = projection * view;
 
-        worldrenderer.render(world, camera.Position, viewProj, 2);
+        worldrenderer.render(world, camera.Position, viewProj, viewDistance);
     
         glfwSwapBuffers(window);
         glfwPollEvents();

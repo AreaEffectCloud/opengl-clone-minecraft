@@ -2,7 +2,6 @@
 #include <cstdint>
 
 namespace ocm {
-
     enum class BlockID : uint8_t {
         AIR = 0,
         DIRT = 1,

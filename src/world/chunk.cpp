@@ -1,33 +1,38 @@
 #include "chunk.hpp"
+#include "../gfx/vertex.hpp"
 #include <cstring>
+#include <algorithm>
+#include <GLFW/glfw3.h>
 
 namespace ocm {
     Chunk::Chunk(int cx, int cz)
-        : m_cx(cx), m_cz(cz), m_blocks(static_cast<size_t>(CHUNK_SIZE_X) * CHUNK_SIZE_Y * CHUNK_SIZE_Z, 0) {
+        : m_cx(cx), m_cz(cz), is_dirty(true), is_meshing(false),
+          vao(0), vbo(0), ebo(0), indexCount(0) {
+        // ブロックデータを空気(0)で初期化
+        std::memset(m_blocks, 0, sizeof(m_blocks));
     }
     
     Chunk::~Chunk() {
-        destroy_gl_resources();
-    };
-
-    void Chunk::destroy_gl_resources() {
         if (vao != 0) {
             glDeleteVertexArrays(1, &vao);
             glDeleteBuffers(1, &vbo);
             glDeleteBuffers(1, &ebo);
-            vao = vbo = ebo = 0;
         }
-    }
+    };
 
-    uint8_t Chunk::get_block(int x, int y, int z) const noexcept {
+    uint8_t Chunk::get_block(int x, int y, int z) const {
         if (x < 0 || x >= CHUNK_SIZE_X || y < 0 || y >= CHUNK_SIZE_Y || z < 0 || z >= CHUNK_SIZE_Z) return 0; // AIR
-        return m_blocks[index(x, y, z)];
+        return m_blocks[get_index(x, y, z)];
     }
     
-    void Chunk::set_block(int x, int y, int z, uint8_t id) noexcept {
+    void Chunk::set_block(int x, int y, int z, uint8_t id) {
         if (x < 0 || x >= CHUNK_SIZE_X || y < 0 || y >= CHUNK_SIZE_Y || z < 0 || z >= CHUNK_SIZE_Z) return;
-        m_blocks[index(x, y, z)] = id;
-        isDirty = true;
+
+        int idx = get_index(x, y, z);
+        if (m_blocks[idx] != id) {
+            m_blocks[idx] = id;
+            is_dirty = true;
+        }
     }
 
     void Chunk::add_face(
@@ -41,7 +46,6 @@ namespace ocm {
         float fx = static_cast<float>(x);
         float fy = static_cast<float>(y);
         float fz = static_cast<float>(z);
-
         // Determine the faceID
         float fID = static_cast<float>(dir);
         
@@ -116,14 +120,5 @@ namespace ocm {
         indices.push_back(vertex_offset + 0);
 
         vertex_offset += 4;
-    }
-
-    uint8_t get_safe_block(const Chunk& chunk, int x, int y, int z) {
-        if (x < 0 || x >= CHUNK_SIZE_X || 
-            y < 0 || y >= CHUNK_SIZE_Y || 
-            z < 0 || z >= CHUNK_SIZE_Z)  {
-                return 0; // チャンク外は空気とみなす
-        }
-        return chunk.get_block(x, y, z);
     }
 } // namespace ocm

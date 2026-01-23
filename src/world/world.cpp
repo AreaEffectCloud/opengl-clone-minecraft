@@ -116,16 +116,22 @@ namespace ocm {
                 float selector = fractal_noise(world_x * 0.005f, world_z * 0.005f, 3, 0.5f, 2.0f);
                 // 境界をはっきりさせる
                 selector = std::clamp((selector - 0.4f) * 5.0f, 0.0f, 1.0f);
-
                 // Plain noise
                 float plain_height = fractal_noise(world_x * 0.01f, world_z * 0.01f, 4, 0.5f, 2.0f) * 20.0f + 35.0f;
-
                 // Mountain noise
                 float mountain_height = fractal_noise(world_x * 0.02f, world_z * 0.02f, 6, 0.6f, 2.0f);
                 mountain_height = std::pow(mountain_height, 1.5f) * 80.0f + 40.0f;
 
+                float original_height = lerp(plain_height, mountain_height, selector);
+
+                // 川の計算
+                float river_noise = fractal_noise(world_x * 0.004f, world_z * 0.004f, 2, 0.5f, 2.0f);
+                float river_v = std::abs(river_noise);
+                float river_mask = std::clamp(river_v / 0.05f, 0.0f, 1.0f);
+
                 // blend two heights
-                int terrain_height = static_cast<int>(lerp(plain_height, mountain_height, selector));
+                float target_river_height = static_cast<float>(SEA_LEVEL - 4);
+                int terrain_height = static_cast<int>(lerp(target_river_height, original_height, river_mask));
 
                 // 2. Humidity noise
                 float humidity = fractal_noise(world_x * 0.008f, world_z * 0.008f, 2, 0.5f, 2.0f);
@@ -139,11 +145,10 @@ namespace ocm {
                         // 地面の下
                         if (y == terrain_height - 1) {
                             // 表面のブロック
-                            if (is_desert) {
+                            if (is_desert || y < SEA_LEVEL + 1) {
                                 id = static_cast<uint8_t>(BlockID::SAND);
                             } else {
-                                // 海面よりも下で表面なら砂
-                                id = (y < SEA_LEVEL + 2) ? static_cast<uint8_t>(BlockID::SAND) : static_cast<uint8_t>(BlockID::GRASS);
+                                id = static_cast<uint8_t>(BlockID::GRASS);
                             }
 
                             // 山岳地帯の山頂付近は石

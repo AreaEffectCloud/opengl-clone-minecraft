@@ -1,5 +1,6 @@
 #include "chunk.hpp"
 #include "../gfx/vertex.hpp"
+#include "../block/block.hpp"
 #include <cstring>
 #include <algorithm>
 #include <GLFW/glfw3.h>
@@ -7,7 +8,8 @@
 namespace ocm {
     Chunk::Chunk(int cx, int cz)
         : m_cx(cx), m_cz(cz), is_dirty(true), is_meshing(false),
-          vao(0), vbo(0), ebo(0), indexCount(0) {
+          vao(0), vbo(0), ebo(0), indexCount(0),
+          trans_vao(0), trans_vbo(0), trans_ebo(0), trans_indexCount(0) {
         // ブロックデータを空気(0)で初期化
         std::memset(m_blocks, 0, sizeof(m_blocks));
     }
@@ -17,6 +19,11 @@ namespace ocm {
             glDeleteVertexArrays(1, &vao);
             glDeleteBuffers(1, &vbo);
             glDeleteBuffers(1, &ebo);
+        }
+        if (trans_vao != 0) {
+            glDeleteVertexArrays(1, &trans_vao);
+            glDeleteBuffers(1, &trans_vbo);
+            glDeleteBuffers(1, &trans_ebo);
         }
     };
 
@@ -46,6 +53,13 @@ namespace ocm {
         float fx = static_cast<float>(x);
         float fy = static_cast<float>(y);
         float fz = static_cast<float>(z);
+
+        // 水面を下げる
+        float yoffset = 0.0f;
+        if (blockID == static_cast<uint8_t>(BlockID::WATER)) {
+            yoffset = -0.1f;
+        }
+
         // Determine the faceID
         float fID = static_cast<float>(dir);
         
@@ -62,9 +76,9 @@ namespace ocm {
             textureLayer = 5.0f;
         } else if (blockID == 5) { // COBBLESTONE
             textureLayer = 6.0f;
-        } else if (blockID == 6) { // COAL_ORE
+        } else if (blockID == 6) { // WATER
             textureLayer = 7.0f;
-        } else if (blockID == 7) { // IRON_ORE
+        } else if (blockID == 7) { // LOG
             textureLayer = 8.0f;
         } else {
             textureLayer = 0.0f; // Placeholder
@@ -73,10 +87,10 @@ namespace ocm {
         // Define the 4 vertices for each face based on direction
         switch (dir) {
             case TOP: // Y+
-                vertices.push_back({fx,   fy+1, fz+1, 0, 0, fID, textureLayer});
-                vertices.push_back({fx+1, fy+1, fz+1, 1, 0, fID, textureLayer});
-                vertices.push_back({fx+1, fy+1, fz,   1, 1, fID, textureLayer});
-                vertices.push_back({fx,   fy+1, fz,   0, 1, fID, textureLayer});
+                vertices.push_back({fx,   fy+1 + yoffset, fz+1, 0, 0, fID, textureLayer});
+                vertices.push_back({fx+1, fy+1 + yoffset, fz+1, 1, 0, fID, textureLayer});
+                vertices.push_back({fx+1, fy+1 + yoffset, fz,   1, 1, fID, textureLayer});
+                vertices.push_back({fx,   fy+1 + yoffset, fz,   0, 1, fID, textureLayer});
                 break;
             case BOTTOM: // Y-
                 vertices.push_back({fx,   fy, fz,   0, 0, fID, textureLayer});
@@ -87,26 +101,26 @@ namespace ocm {
             case SIDE_FRONT: // Z+
                 vertices.push_back({fx,   fy,   fz+1, 0, 1, fID, textureLayer});
                 vertices.push_back({fx+1, fy,   fz+1, 1, 1, fID, textureLayer});
-                vertices.push_back({fx+1, fy+1, fz+1, 1, 0, fID, textureLayer});
-                vertices.push_back({fx,   fy+1, fz+1, 0, 0, fID, textureLayer});
+                vertices.push_back({fx+1, fy+1 + yoffset, fz+1, 1, 0, fID, textureLayer});
+                vertices.push_back({fx,   fy+1 + yoffset, fz+1, 0, 0, fID, textureLayer});
                 break;
             case SIDE_BACK: // Z-
                 vertices.push_back({fx+1, fy,   fz,   0, 1, fID, textureLayer});
                 vertices.push_back({fx,   fy,   fz,   1, 1, fID, textureLayer});
-                vertices.push_back({fx,   fy+1, fz,   1, 0, fID, textureLayer});
-                vertices.push_back({fx+1, fy+1, fz,   0, 0, fID, textureLayer});
+                vertices.push_back({fx,   fy+1 + yoffset, fz,   1, 0, fID, textureLayer});
+                vertices.push_back({fx+1, fy+1 + yoffset, fz,   0, 0, fID, textureLayer});
                 break;
             case SIDE_RIGHT: // X+
                 vertices.push_back({fx+1, fy,   fz+1, 0, 1, fID, textureLayer});
                 vertices.push_back({fx+1, fy,   fz,   1, 1, fID, textureLayer});
-                vertices.push_back({fx+1, fy+1, fz,   1, 0, fID, textureLayer});
-                vertices.push_back({fx+1, fy+1, fz+1, 0, 0, fID, textureLayer});
+                vertices.push_back({fx+1, fy+1 + yoffset, fz,   1, 0, fID, textureLayer});
+                vertices.push_back({fx+1, fy+1 + yoffset, fz+1, 0, 0, fID, textureLayer});
                 break;
             case SIDE_LEFT: // X-
                 vertices.push_back({fx,   fy,   fz,   0, 1, fID, textureLayer});
                 vertices.push_back({fx,   fy,   fz+1, 1, 1, fID, textureLayer});
-                vertices.push_back({fx,   fy+1, fz+1, 1, 0, fID, textureLayer});
-                vertices.push_back({fx,   fy+1, fz,   0, 0, fID, textureLayer});
+                vertices.push_back({fx,   fy+1 + yoffset, fz+1, 1, 0, fID, textureLayer});
+                vertices.push_back({fx,   fy+1 + yoffset, fz,   0, 0, fID, textureLayer});
                 break;
         }
 

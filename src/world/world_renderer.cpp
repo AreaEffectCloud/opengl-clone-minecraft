@@ -19,14 +19,33 @@ namespace ocm {
         update_meshes(const_cast<World&>(world));
         // シェーダのグローバル設定
         m_cubeRenderer.setup_frame(glm::value_ptr(viewProj), camPos);
-        // 各チャンクを描画
-        for (Chunk* chunk : visibleChunks) {
-            // VAOが作成されていない(一度もメッシュ計算が終わっていない)チャンクをスキップ
-            if (chunk->vao == 0 || chunk->indexCount == 0) continue;
 
-            // 描画
-            m_cubeRenderer.draw_chunk(*chunk);
+        // 1. 不透明ブロック
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glEnable(GL_DEPTH_TEST);
+
+        for (Chunk* chunk : visibleChunks) {
+            // VAOが作成されていない(一度もメッシュ計算が終わっていない)チャンクはスキップ
+            if (chunk->vao != 0 || chunk->indexCount != 0) {
+                m_cubeRenderer.draw_chunk(*chunk);
+            }
         }
+
+        // 2. 半透明ブロック
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // 水同士の重なりで消えないよう、深層書き込みを無効化
+        glDepthMask(GL_FALSE);
+
+        for (Chunk* chunk : visibleChunks) {
+            if (chunk->trans_vao != 0 || chunk->trans_indexCount != 0) {
+                m_cubeRenderer.draw_chunk_transparent(*chunk);
+            }
+        }
+
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
     }
 
     void WorldRenderer::update_meshes(const World& world) {
@@ -45,7 +64,7 @@ namespace ocm {
             auto& data = resultsToUpload.front();
             Chunk* chunk = world.get_chunk_ptr(data.cx, data.cz);
             if (chunk) {
-                m_cubeRenderer.update_chunk_mesh(*chunk, data.vertices, data.indices);
+                m_cubeRenderer.update_chunk_mesh(*chunk, data);
                 chunk->is_meshing = false;
             }
             resultsToUpload.pop();
@@ -75,7 +94,8 @@ namespace ocm {
         gfx::MeshData result;
         result.cx = cx;
         result.cz = cz;
-        uint32_t vertex_offset = 0;
+        uint32_t opaque_vertex_offset = 0;
+        uint32_t transparent_vertex_offset = 0;
 
         // チャンクを取得
         Chunk* chunk = world.get_chunk_ptr(cx, cz);
@@ -90,24 +110,43 @@ namespace ocm {
                     int wx = cx * CHUNK_SIZE_X + x;
                     int wy = y;
                     int wz = cz * CHUNK_SIZE_Z + z;
+
+                    bool is_water = (block == static_cast<uint8_t>(BlockID::WATER));
+
+                    // 格納先の参照を切り替える
+                    auto& target_vertices = is_water ? result.trans_vertices : result.opaque_vertices;
+                    auto& target_indices = is_water ? result.trans_indices : result.opaque_indices;
+                    auto& target_offset = is_water ? transparent_vertex_offset : opaque_vertex_offset;
+
+                    auto shuold_add_face = [&](int nx, int ny, int nz) {
+                        uint8_t neighbor = static_cast<uint8_t>(world.get_block(nx, ny, nz));
+
+                        if (neighbor == 0) return true; // AIR
+
+                        if (is_water) {
+                            return false;
+                        } else {
+                            return (neighbor == static_cast<uint8_t>(BlockID::WATER));
+                        }
+                    };
     
-                    if (!world.is_opaque(wx, wy + 1, wz)) {
-                        Chunk::add_face(result.vertices, result.indices, x, y, z, FaceDirection::TOP, vertex_offset, block);
+                    if (shuold_add_face(wx, wy + 1, wz)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::TOP, target_offset, block);
                     }
-                    if (wy > 0 && !world.is_opaque(wx, wy - 1, wz)) {
-                        Chunk::add_face(result.vertices, result.indices, x, y, z, FaceDirection::BOTTOM, vertex_offset, block);
+                    if (wy > 0 && shuold_add_face(wx, wy - 1, wz)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::BOTTOM, target_offset, block);
                     }
-                    if (!world.is_opaque(wx, wy, wz + 1)) {
-                        Chunk::add_face(result.vertices, result.indices, x, y, z, FaceDirection::SIDE_FRONT, vertex_offset, block);
+                    if (shuold_add_face(wx, wy, wz + 1)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_FRONT, target_offset, block);
                     }
-                    if (!world.is_opaque(wx, wy, wz - 1)) {
-                        Chunk::add_face(result.vertices, result.indices, x, y, z, FaceDirection::SIDE_BACK, vertex_offset, block);
+                    if (shuold_add_face(wx, wy, wz - 1)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_BACK, target_offset, block);
                     }
-                    if (!world.is_opaque(wx + 1, wy, wz)) {
-                        Chunk::add_face(result.vertices, result.indices, x, y, z, FaceDirection::SIDE_RIGHT, vertex_offset, block);
+                    if (shuold_add_face(wx + 1, wy, wz)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_RIGHT, target_offset, block);
                     }
-                    if (!world.is_opaque(wx - 1, wy, wz)) {
-                        Chunk::add_face(result.vertices, result.indices, x, y, z, FaceDirection::SIDE_LEFT, vertex_offset, block);
+                    if (shuold_add_face(wx - 1, wy, wz)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_LEFT, target_offset, block);
                     }
                 }
             }

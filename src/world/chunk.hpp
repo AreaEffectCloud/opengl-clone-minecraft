@@ -26,10 +26,11 @@ namespace ocm {
             ~Chunk();
 
             // OpenGLのリソースID
-            uint32_t vao = 0;
-            uint32_t vbo = 0;
-            uint32_t ebo = 0;
+            uint32_t vao = 0, vbo = 0, ebo = 0;
             int indexCount = 0;
+
+            uint32_t trans_vao = 0, trans_vbo = 0, trans_ebo = 0;
+            int trans_indexCount = 0;
  
             // メッシュの再構築が必要か
             bool is_dirty = true;

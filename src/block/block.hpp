@@ -9,11 +9,11 @@ namespace ocm {
         SAND = 3,
         STONE = 4,
         COBBLESTONE = 5,
-        COAL_ORE = 6,
-        IRON_ORE = 7,
-        LOG = 8,
-        PLANKS = 9,
-        LEAVES = 10,
-        WATER = 11,
+        WATER = 6,
+        LOG = 7,
+        PLANKS = 8,
+        LEAVES = 9,
+        COAL_ORE = 10,
+        IRON_ORE = 11,
     };
 }

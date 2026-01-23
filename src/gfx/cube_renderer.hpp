@@ -20,14 +20,17 @@ namespace gfx {
             void setup_frame(const float* viewProj4x4, const glm::vec3& camPos);
 
             // 特定のチャンクのメッシュ(VBO/VAO)を生成・更新
-            void update_chunk_mesh(
-                ocm::Chunk& chunk, 
+            void update_chunk_mesh(ocm::Chunk& chunk, const gfx::MeshData& data);
+            // 内部的なバッファ生成・転送ヘルパー
+            void update_buffer(
+                uint32_t& vao, uint32_t& vbo, uint32_t& ebo,
                 const std::vector<ChunkVertex>& vertices, 
                 const std::vector<uint32_t>& indices
             );
 
             // 指定されたチャンクのVAOをバインドして描画
             void draw_chunk(const ocm::Chunk& chunk);
+            void draw_chunk_transparent(const ocm::Chunk& chunk);
 
             GLuint program() const noexcept { return m_program; };
             GLuint textureArray() const noexcept { return m_textureArray; };

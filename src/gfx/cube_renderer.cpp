@@ -24,6 +24,7 @@ std::vector<std::string> texturePaths = {
     "../src/assets/textures/sand.png",
     "../src/assets/textures/stone.png",
     "../src/assets/textures/cobblestone.png",
+    "../src/assets/textures/water.png",
     "../src/assets/textures/coal_ore.png",
     "../src/assets/textures/iron_ore.png",
 };
@@ -170,7 +171,7 @@ namespace gfx {
         glBindTexture(GL_TEXTURE_2D_ARRAY, m_textureArray);
         glUniform1i(glGetUniformLocation(m_program, "uTextureArray"), 0);
 
-        // texture
+        // High Contrast
         // glEnable(GL_FRAMEBUFFER_SRGB);
         // glDisable(0x809D); // disable multisampling
 
@@ -182,28 +183,41 @@ namespace gfx {
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         glFrontFace(GL_CCW); // define front side as counter clockwise
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
-    void CubeRenderer::update_chunk_mesh(
-        ocm::Chunk& chunk,
+    void CubeRenderer::update_chunk_mesh(ocm::Chunk& chunk, const MeshData& data) {
+        // 不透明メッシュ
+        update_buffer(chunk.vao, chunk.vbo, chunk.ebo, data.opaque_vertices, data.opaque_indices);
+        chunk.indexCount = static_cast<int>(data.opaque_indices.size());
+
+        // 透明メッシュ
+        update_buffer(chunk.trans_vao, chunk.trans_vbo, chunk.trans_ebo, data.trans_vertices, data.trans_indices);
+        chunk.trans_indexCount = static_cast<int>(data.trans_indices.size());
+    }
+
+    void CubeRenderer::update_buffer(
+        uint32_t& vao, uint32_t& vbo, uint32_t& ebo,
         const std::vector<ChunkVertex>& vertices, 
         const std::vector<uint32_t>& indices
     ) {
-        if (chunk.vao == 0) {
-            glGenVertexArrays(1, &chunk.vao);
-            glGenBuffers(1, &chunk.vbo);
-            glGenBuffers(1, &chunk.ebo);
+        if (vertices.empty()) return;
+        if (vao == 0) {
+            glGenVertexArrays(1, &vao);
+            glGenBuffers(1, &vbo);
+            glGenBuffers(1, &ebo);
         }
 
         // Bind and upload data
-        glBindVertexArray(chunk.vao);
-
+        glBindVertexArray(vao);
         // transfer vertex data
-        glBindBuffer(GL_ARRAY_BUFFER, chunk.vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(ChunkVertex), vertices.data(), GL_STATIC_DRAW);
 
         // transfer index data
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chunk.ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(uint32_t), indices.data(), GL_STATIC_DRAW);
 
         // set vertex attribute pointers
@@ -211,18 +225,17 @@ namespace gfx {
 
         // aPos
         glEnableVertexAttribArray(0); // position
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, x));
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
         // aTex
         glEnableVertexAttribArray(1); // uv
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, u));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
         // aFaceID
         glEnableVertexAttribArray(2); // face index
-        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, faceID));
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
         // aBlockID
         glEnableVertexAttribArray(3); // block ID
-        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(ChunkVertex, blockID));
-
-        chunk.indexCount = static_cast<uint32_t>(indices.size());
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+        
         // unbind VAO
         glBindVertexArray(0);
     }
@@ -241,7 +254,27 @@ namespace gfx {
 
         glBindVertexArray(chunk.vao);
         glDrawElements(GL_TRIANGLES, chunk.indexCount, GL_UNSIGNED_INT, 0);
+    }
 
-        // std::printf("[CubeRenderer] Draw Chunk at (%d, %d): %u indices\n", chunk.cx(), chunk.cz(), chunk.indexCount);
+    void CubeRenderer::draw_chunk_transparent(const ocm::Chunk& chunk) {
+        if (chunk.trans_vao == 0 || chunk.trans_indexCount == 0) return;
+
+        glm::vec3 chunkPos(
+            static_cast<float>(chunk.cx() * ocm::CHUNK_SIZE_X),
+            0.0f,
+            static_cast<float>(chunk.cz() * ocm::CHUNK_SIZE_Z)
+        );
+
+        GLint chunkPosLoc = glGetUniformLocation(m_program, "uChunkPos");
+        glUniform3fv(chunkPosLoc, 1, &chunkPos[0]);
+
+        // 水用の VAO をバインド
+        glBindVertexArray(chunk.trans_vao);
+        // EBO を使用して描画
+        glDrawElements(GL_TRIANGLES, chunk.trans_indexCount, GL_UNSIGNED_INT, 0);
+        // 水を裏面からも見えるように
+        glDisable(GL_CULL_FACE);
+
+        // glBindVertexArray(0);
     }
 } // namespace gfx

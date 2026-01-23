@@ -102,6 +102,8 @@ namespace ocm {
         // 複数のチャンクを管理する場合、 
         // std::map<std::pair<int, int>, ChunkPtr> m_chunks 等での管理が理想です
         auto chunk = std::make_unique<Chunk>(cx, cz);
+        // 海面の高さ
+        const int SEA_LEVEL = 48;
 
         for (int x = 0; x < CHUNK_SIZE_X; x++) {
             for (int z = 0; z < CHUNK_SIZE_Z; z++) {
@@ -109,37 +111,56 @@ namespace ocm {
                 float world_x = static_cast<float>(cx * CHUNK_SIZE_X + x);
                 float world_z = static_cast<float>(cz * CHUNK_SIZE_Z + z);
 
+                // 1. 地形の高さ
                 // セレクターノイズ: 地形の種類を決定
                 float selector = fractal_noise(world_x * 0.005f, world_z * 0.005f, 3, 0.5f, 2.0f);
                 // 境界をはっきりさせる
                 selector = std::clamp((selector - 0.4f) * 5.0f, 0.0f, 1.0f);
 
                 // Plain noise
-                float plain_height = fractal_noise(world_x * 0.01f, world_z * 0.01f, 4, 0.5f, 2.0f);
-                plain_height = plain_height * 20.0f + 30.0f;
+                float plain_height = fractal_noise(world_x * 0.01f, world_z * 0.01f, 4, 0.5f, 2.0f) * 20.0f + 35.0f;
 
                 // Mountain noise
                 float mountain_height = fractal_noise(world_x * 0.02f, world_z * 0.02f, 6, 0.6f, 2.0f);
-                mountain_height = std::pow(mountain_height, 1.5f);
-                mountain_height = mountain_height * 80.0f + 40.0f;
+                mountain_height = std::pow(mountain_height, 1.5f) * 80.0f + 40.0f;
 
                 // blend two heights
-                int final_height = static_cast<int>(lerp(plain_height, mountain_height, selector));
-                final_height = std::clamp(final_height, 1, CHUNK_SIZE_Y - 1);
+                int terrain_height = static_cast<int>(lerp(plain_height, mountain_height, selector));
 
-                // Set blocks up to final_height
+                // 2. Humidity noise
+                float humidity = fractal_noise(world_x * 0.008f, world_z * 0.008f, 2, 0.5f, 2.0f);
+                bool is_desert = (humidity < 0.35f);
+
+                // Set blocks up to terrain_height
                 for (int y = 0; y < CHUNK_SIZE_Y; y++) {
                     uint8_t id = static_cast<uint8_t>(BlockID::AIR);
 
-                    if (y < final_height) {
-                        if (y == final_height - 1) {
+                    if (y < terrain_height) {
+                        // 地面の下
+                        if (y == terrain_height - 1) {
+                            // 表面のブロック
+                            if (is_desert) {
+                                id = static_cast<uint8_t>(BlockID::SAND);
+                            } else {
+                                // 海面よりも下で表面なら砂
+                                id = (y < SEA_LEVEL + 2) ? static_cast<uint8_t>(BlockID::SAND) : static_cast<uint8_t>(BlockID::GRASS);
+                            }
+
                             // 山岳地帯の山頂付近は石
-                            if (selector > 0.7f && y > 80) id = static_cast<uint8_t>(BlockID::STONE);
-                            else id = static_cast<uint8_t>(BlockID::GRASS);
-                        } else if (y >= final_height - 4) {
-                            id = static_cast<uint8_t>(BlockID::DIRT);
+                            // if (selector > 0.7f && y > 80) id = static_cast<uint8_t>(BlockID::STONE);
+                            // else id = static_cast<uint8_t>(BlockID::GRASS);
+
+                        } else if (y >= terrain_height - 4) {
+                            // 地表近くの層
+                            id = is_desert ? static_cast<uint8_t>(BlockID::SAND) : static_cast<uint8_t>(BlockID::DIRT);
                         } else {
+                            // 深い層
                             id = static_cast<uint8_t>(BlockID::STONE);
+                        }
+                    } else {
+                        // 地面よりも上で海面以下なら水で満たす
+                        if (y <= SEA_LEVEL) {
+                            id = static_cast<uint8_t>(BlockID::WATER);
                         }
                     }
                     chunk->set_block(x, y, z, id);
@@ -306,7 +327,7 @@ namespace ocm {
     }
 
     bool World::is_opaque(int wx, int wy, int wz) const {
-        // Return true if the block at (wx, wy, wz) is not AIR
-        return get_block(wx, wy, wz) != BlockID::AIR;
+        BlockID id = get_block(wx, wy, wz);
+        return (id == BlockID::AIR || id == BlockID::WATER) ? false : true;
     }
 } // namespace ocm

@@ -5,13 +5,16 @@ I've made the voxel game like Minecraft on C++.
 - cgml
 - glad (glad.h)
 - GLFW (glfw3.h, glfw3native.h)
+  - glfw3.dll
+  - libglfw3dll.a
 - glm
 - KHR (khrplatform.h)
 - stb (stb_image.h)
 
 ## Configuration
 - /assets
-  - shader: vertex, fragment shader (glsl)
+  - /shader: vertex, fragment shader (glsl)
+  - /textures: *.png
 - /block
   - block.hpp
 - /gfx

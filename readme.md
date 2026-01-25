@@ -1,5 +1,5 @@
 # Cloning Minecraft with OpenGL
-I've made the voxel game like Minecraft on C++.
+I've made the voxel game like Minecraft with C++.
 
 ## Library
 - cgml
@@ -30,7 +30,7 @@ I've made the voxel game like Minecraft on C++.
   - chunk
   - world_renderer
   - world
-- main_worldgen.cpp
+- main.cpp
 
 ## Compile
 Move to the `bin` directory and run it.

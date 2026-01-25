@@ -19,7 +19,7 @@ using namespace ocm;
 static const unsigned int SCR_WIDTH = 1920, SCR_HEIGHT = 1090;
 static const unsigned int POSITION_X = 0, POSITION_Y = 40;
 
-static const int viewDistance = 4; // viewDistance * 2 chunks
+static const int viewDistance = 5; // viewDistance * 2 chunks
 
 static util::Camera camera;
 static float lastX = (float)SCR_WIDTH / 2.0f;

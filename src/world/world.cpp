@@ -1,4 +1,5 @@
 #include "world.hpp"
+#include "structures.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
@@ -6,18 +7,19 @@
 #include <iostream>
 #include <numeric>
 #include <map>
+#include <random>
 
 namespace ocm {
     World::World() {
-        p.resize(512);
-        std::vector<int> perm(256);
-        std::iota(perm.begin(), perm.end(), 0); // Fill with values 0..255
-
+        // Initialize permutation table
+        // p.resize(256);
+        // std::vector<int> perm(256);
+        // std::iota(perm.begin(), perm.end(), 0); // Fill with values 0..255
         // TODO: Shuffle perm based on seed for better randomness
 
-        for (int i = 0; i < 256; i++) {
-            p[i] = p[i + 256] = perm[i];
-        }
+        // for (int i = 0; i < 256; i++) {
+        //     p[i] = p[i + 256] = perm[i];
+        // }
     }
 
     World::~World() {
@@ -27,6 +29,16 @@ namespace ocm {
     void World::init(uint32_t seed) {
         m_seed = seed;
         m_chunks.clear();
+
+        // 置換テーブル p をシード値に基づいてシャッフル
+        p.resize(256);
+        std::iota(p.begin(), p.end(), 0);
+        std::default_random_engine engine(seed);
+        std::shuffle(p.begin(), p.end(), engine);
+
+        // 参照を楽にするために 256〜511 にコピー
+        p.insert(p.end(), p.begin(), p.end());
+
         // generate spawn chunk at (0,0) by default
         generate_chunk(0, 0);
         std::printf("[World] initialized with seed=%u\n", m_seed);
@@ -98,44 +110,67 @@ namespace ocm {
         return total / maxValue;
     }
 
+    float World::get_noise_random(int x, int z) {
+        unsigned int n = (unsigned int)(x * 374761393 + z * 668265263 + m_seed);
+        n = (n ^ (n >> 13)) * 1274126177;
+        return (float)(n & 0x7fffffff) / 0x7fffffff;
+    }
+
     void World::generate_chunk(int cx, int cz) {
         // 複数のチャンクを管理する場合、 
         // std::map<std::pair<int, int>, ChunkPtr> m_chunks 等での管理が理想です
         auto chunk = std::make_unique<Chunk>(cx, cz);
-        // 海面の高さ
-        const int SEA_LEVEL = 48;
+        int terrain_height_map[CHUNK_SIZE_X][CHUNK_SIZE_Z];
 
+        // 海面の高さ
+        const int SEA_LEVEL = 63;
+
+        // シード値によるオフセット
+        float offsetX = static_cast<float>(m_seed % 10000);
+        float offsetZ = static_cast<float>((m_seed / 10000) % 10000);
+
+        // 地形配置
         for (int x = 0; x < CHUNK_SIZE_X; x++) {
             for (int z = 0; z < CHUNK_SIZE_Z; z++) {
                 // translate chunk-local coordinates to world coordinates
                 float world_x = static_cast<float>(cx * CHUNK_SIZE_X + x);
                 float world_z = static_cast<float>(cz * CHUNK_SIZE_Z + z);
 
-                // 1. 地形の高さ
-                // セレクターノイズ: 地形の種類を決定
-                float selector = fractal_noise(world_x * 0.005f, world_z * 0.005f, 3, 0.5f, 2.0f);
-                // 境界をはっきりさせる
-                selector = std::clamp((selector - 0.4f) * 5.0f, 0.0f, 1.0f);
-                // Plain noise
-                float plain_height = fractal_noise(world_x * 0.01f, world_z * 0.01f, 4, 0.5f, 2.0f) * 20.0f + 35.0f;
-                // Mountain noise
-                float mountain_height = fractal_noise(world_x * 0.02f, world_z * 0.02f, 6, 0.6f, 2.0f);
-                mountain_height = std::pow(mountain_height, 1.5f) * 80.0f + 40.0f;
+                // 1. バイオーム判定用のノイズ
+                float selector_raw = fractal_noise(world_x * 0.002f + offsetX, world_z * 0.002f + offsetZ, 3, 0.5f, 2.0f);
+                float mountain_weight = std::clamp((selector_raw - 0.5f) * 3.3f, 0.0f, 1.0f);
+                float selector = std::clamp((selector_raw - 0.3f) * 2.0f, 0.0f, 1.0f);
 
-                float original_height = lerp(plain_height, mountain_height, selector);
+                float humidity = fractal_noise(world_x * 0.01f + offsetX, world_z * 0.01f + offsetZ, 2, 0.5f, 2.0f);
 
-                // 川の計算
-                float river_noise = fractal_noise(world_x * 0.004f, world_z * 0.004f, 2, 0.5f, 2.0f);
-                float river_v = std::abs(river_noise);
-                float river_mask = std::clamp(river_v / 0.05f, 0.0f, 1.0f);
+                // 2. 地形の高さ計算
+                // 平原・砂漠
+                float lowland_height = fractal_noise(world_x * 0.008f + offsetX, world_z * 0.008f + offsetZ, 3, 0.3f, 2.0f) * 10.0f + 64.0f;
+                // 山岳 (累乗で急傾斜)
+                float mountain_height_raw = fractal_noise(world_x * 0.012f + offsetX, world_z * 0.012f + offsetZ, 5, 0.55f, 2.0f);
+                mountain_height_raw = std::max(0.0f, mountain_height_raw);
+                float mountain_height = std::pow(mountain_height_raw, 2.0f) * 120.0f + 63.0f;
+
+                // 基本地形の合成
+                float original_height = lerp(lowland_height, mountain_height, mountain_weight);
+
+                // 3. 川の計算
+                float river_n = fractal_noise(world_x * 0.005f + offsetX, world_z * 0.005f + offsetZ, 2, 0.5f, 2.0f);
+                float river_v = std::abs(river_n - 0.5f) * 2.0f;
+                float river_mask = std::clamp(river_v / 0.15f, 0.0f, 1.0f);
+
+                // 川の深さ
+                float river_depth = 10.0f * (1.0f - river_mask);
+                original_height -= river_depth;
 
                 // blend two heights
-                float target_river_height = static_cast<float>(SEA_LEVEL - 4);
-                int terrain_height = static_cast<int>(lerp(target_river_height, original_height, river_mask));
+                int terrain_height = static_cast<int>(original_height);
+                terrain_height_map[x][z] = terrain_height;
 
                 // 2. Humidity noise
-                float humidity = fractal_noise(world_x * 0.008f, world_z * 0.008f, 2, 0.5f, 2.0f);
-                bool is_desert = (humidity < 0.35f);
+                bool is_mountain = (mountain_weight > 0.4f);
+                bool is_desert = (!is_mountain && humidity < 0.35f);
+                bool is_beach = (!is_mountain && !is_desert && terrain_height >= SEA_LEVEL && terrain_height <= 65);
 
                 // Set blocks up to terrain_height
                 for (int y = 0; y < CHUNK_SIZE_Y; y++) {
@@ -144,34 +179,77 @@ namespace ocm {
                     if (y < terrain_height) {
                         // 地面の下
                         if (y == terrain_height - 1) {
-                            // 表面のブロック
-                            if (is_desert || y < SEA_LEVEL + 1) {
+
+                            if ((is_desert && y < 70) || is_beach || (river_depth > 0.5f && river_depth < 4.0f)) {
                                 id = static_cast<uint8_t>(BlockID::SAND);
+
+                            } else if (is_mountain) {
+                                if (y > 95) {
+                                    id = static_cast<uint8_t>(BlockID::STONE); // 山頂
+                                } else {
+                                    id = static_cast<uint8_t>(BlockID::GRASS);
+                                }
+
+                            } else if (y < SEA_LEVEL) {
+                                id = (river_depth >= 4.0f) ? static_cast<uint8_t>(BlockID::DIRT) : static_cast<uint8_t>(BlockID::SAND);
                             } else {
                                 id = static_cast<uint8_t>(BlockID::GRASS);
                             }
 
-                            // 山岳地帯の山頂付近は石
-                            // if (selector > 0.7f && y > 80) id = static_cast<uint8_t>(BlockID::STONE);
-                            // else id = static_cast<uint8_t>(BlockID::GRASS);
-
-                        } else if (y >= terrain_height - 4) {
-                            // 地表近くの層
-                            id = is_desert ? static_cast<uint8_t>(BlockID::SAND) : static_cast<uint8_t>(BlockID::DIRT);
                         } else {
-                            // 深い層
-                            id = static_cast<uint8_t>(BlockID::STONE);
+                            bool force_dirt = (y < SEA_LEVEL + 2);
+                            if (force_dirt) {
+                                if (y >= terrain_height - 5) {
+                                    id = (is_desert && y < 70) ? static_cast<uint8_t>(BlockID::SAND) : static_cast<uint8_t>(BlockID::DIRT);
+                                } else {
+                                    id = static_cast<uint8_t>(BlockID::STONE);
+                                }
+                            } else if (is_mountain && y > 90) {
+                                if (y >= terrain_height - 2) id = static_cast<uint8_t>(BlockID::DIRT);
+                                else id = static_cast<uint8_t>(BlockID::STONE);
+                            } else {
+                                if (y >= terrain_height - 4) {
+                                    id = (is_desert && y < 70) ? static_cast<uint8_t>(BlockID::SAND) : static_cast<uint8_t>(BlockID::DIRT);
+                                } else {
+                                    id = static_cast<uint8_t>(BlockID::STONE);
+                                }
+                            }
                         }
-                    } else {
-                        // 地面よりも上で海面以下なら水で満たす
-                        if (y <= SEA_LEVEL) {
-                            id = static_cast<uint8_t>(BlockID::WATER);
-                        }
+                    } else if (y <= SEA_LEVEL) {
+                        id = static_cast<uint8_t>(BlockID::WATER);
                     }
                     chunk->set_block(x, y, z, id);
                 }   
             }
         }
+
+        // デコレーション
+        for (int x = 2; x < CHUNK_SIZE_X - 2; x++) { // 境界ギリギリを避ける
+            for (int z = 2; z < CHUNK_SIZE_Z - 2; z++) {
+                int wx = cx * CHUNK_SIZE_X + x;
+                int wz = cz * CHUNK_SIZE_Z + z;
+
+                // その地点のバイオームと高さを再取得
+                int ground_y = terrain_height_map[x][z]; 
+                uint8_t surface_id = chunk->get_block(x, ground_y - 1, z);
+
+                float r = get_noise_random(wx, wz);
+
+                // 平原の木 (0.5% の確率)
+                if (surface_id == static_cast<uint8_t>(BlockID::GRASS) && r < 0.01f) {
+                    for (const auto& b : structures::OAK_TREE) {
+                        chunk->set_block(x + b.dx, ground_y + b.dy, z + b.dz, b.id);
+                    }
+                }
+                // 砂漠のサボテン (0.3% の確率)
+                else if (surface_id == static_cast<uint8_t>(BlockID::SAND) && r < 0.003f && ground_y > SEA_LEVEL) {
+                    for (const auto& b : structures::CACTUS) {
+                        chunk->set_block(x + b.dx, ground_y + b.dy, z + b.dz, b.id);
+                    }
+                }
+            }
+        }
+
         m_chunks[{cx, cz}] = std::move(chunk);
     }
 
@@ -333,6 +411,12 @@ namespace ocm {
 
     bool World::is_opaque(int wx, int wy, int wz) const {
         BlockID id = get_block(wx, wy, wz);
-        return (id == BlockID::AIR || id == BlockID::WATER) ? false : true;
+        if (id == BlockID::AIR || 
+            id == BlockID::WATER || 
+            id == BlockID::CACTUS ||
+            id == BlockID::LEAVES) {
+            return false;
+        }
+        return true;
     }
 } // namespace ocm

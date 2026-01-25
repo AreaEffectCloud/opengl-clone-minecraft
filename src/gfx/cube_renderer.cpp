@@ -25,6 +25,12 @@ std::vector<std::string> texturePaths = {
     "../src/assets/textures/stone.png",
     "../src/assets/textures/cobblestone.png",
     "../src/assets/textures/water.png",
+    "../src/assets/textures/oak_log.png",
+    "../src/assets/textures/oak_log_top.png",
+    "../src/assets/textures/oak_leaves.png",
+    "../src/assets/textures/cactus_bottom.png",
+    "../src/assets/textures/cactus_side.png",
+    "../src/assets/textures/cactus_top.png",
     "../src/assets/textures/coal_ore.png",
     "../src/assets/textures/iron_ore.png",
 };

@@ -1,21 +1,27 @@
 #include <iostream>
-#include <string>
-#include <fstream>
-#include <sstream>
+#include <cstdlib>
+#include <chrono>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
+#include "world/world.hpp"
+#include "world/world_renderer.hpp"
+#include "util/camera.hpp"
+#include "gfx/cube_renderer.hpp"
 
-static const unsigned int SCR_WIDTH = 800, SCR_HEIGHT = 600;
-const char* vertex_shader_source = "./../src/assets/shader/vertex_shader.glsl";
-const char* fragment_shader_source = "./../src/assets/shader/fragment_shader.glsl";
+using namespace ocm;
 
-// static Camera camera(glm::vec3(5.0f, 20.0f, 40.0f));
+static const unsigned int SCR_WIDTH = 1920, SCR_HEIGHT = 1090;
+static const unsigned int POSITION_X = 0, POSITION_Y = 40;
+
+static const int viewDistance = 4; // viewDistance * 2 chunks
+
+static util::Camera camera;
 static float lastX = (float)SCR_WIDTH / 2.0f;
 static float lastY = (float)SCR_HEIGHT / 2.0f;
 static bool firstMouse = true;
@@ -24,118 +30,180 @@ static float deltaTime = 0.0f;
 static float lastFrame = 0.0f;
 
 static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-// static void set_full_screen(bool full_screen, GLFWmonitor* monitor, int &SCR_WIDTH, int &SCR_HEIGHT);
 static void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-static void key_callback(GLFWwindow* window);
+static void processInput(GLFWwindow* window);
 
-int main() {
+int main(int argc, char** argv) {
+    std::printf("\nRunning the program... \n\n[main] Starting world generation\n");
+    uint32_t seed = 0;
+    if (argc >= 2) {
+        seed = static_cast<uint32_t>(std::strtoul(argv[1], nullptr, 10));
+    } else {
+        seed = static_cast<uint32_t>(std::chrono::system_clock::now().time_since_epoch().count());
+    }
+    std::printf("[main] using seed=%u\n", seed);
+
+    World world;
+    world.init(seed);
+    std::printf("[main] Generating 4x4 world chunks...\n");
+    world.generate_world(4, 4); // generate 4x4 chunks
+    world.dump_stats();
+
+    int sample_h = world.sample_height(CHUNK_SIZE_X * 2, CHUNK_SIZE_Z * 2);
+    std::printf("[main] sample height at center = %d\n", sample_h);
+
     if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW" << std::endl;
-        return -1;
+        std::fprintf(stderr, "failed to initialize GLFW\n");
+        return EXIT_FAILURE;
     }
 
-    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    // #ifdef __APPLE__
-    //     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for MacOS
-    // #endif
-    //     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
 
-    // full screen
-    // bool full_screen = false;
-    // GLFWmonitor* monitor = NULL;
-    // set_full_screen(full_screen, monitor, SCR_WIDTH, SCR_HEIGHT);
+    glfwWindowHint(GLFW_POSITION_X, POSITION_X);
+    glfwWindowHint(GLFW_POSITION_Y, POSITION_Y);
 
-    // create a windowed mode window
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", NULL, NULL);
+    // Create a window
+    GLFWwindow* window = glfwCreateWindow((int)SCR_WIDTH, (int)SCR_HEIGHT, "A Sandbox Game", nullptr, nullptr);
     if (!window) {
         // window or context creation failed
-        std::cerr << "Failed to create GLFW window" << std::endl;
+        std::fprintf(stderr, "Failed to create GLFW window\n");
         glfwTerminate();
-        return -1;
+        return EXIT_FAILURE;
     }
     // to use the OpenGL API
     glfwMakeContextCurrent(window);
 
     // use an extension loader library
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::fprintf(stderr, "Failed to initialize GLFW\n");
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
 
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glViewport(0, 0, (int)SCR_WIDTH, (int)SCR_HEIGHT);
+
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    // glEnable(GL_DEPTH_TEST);
 
-    Shader ourShader(vertex_shader_source, fragment_shader_source);
-
-    struct World world;
-    world_init(&world, (u64)123456789ULL, 4);
-    ivec3s center = { 0, 0, 0 };
-    struct Chunk* center_chunk = world_create_chunk(&world, center);
-    if (!center_chunk) {
-        std::cerr << "Failed to create center chunk" << std::endl;
-    }
-
-    // glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    
-    int width, height, nrChannels;
-    unsigned char* data = stbi_load("./../src/assets/block/cobblestone.png", &width, &height, &nrChannels, 0);
-    if (data) {
-        GLenum format = GL_RGB;
-        if (nrChannels == 4) format = GL_RGBA;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
+    // initialize WorldRenderer
+    WorldRenderer worldrenderer;
+    bool worldRendererReady = false;
+    if (!worldrenderer.init()) {
+        std::fprintf(stderr, "[main] WorldRenderer::init failed\n");
+        // 描画が動作しないが、ワールド自体は初期化済みなので続行は可能
     } else {
-        std::cerr << "Failed to load texture" << std::endl;
+        worldRendererReady = true;
     }
-    stbi_image_free(data);
 
-    ourShader.use();
-    ourShader.setInt("our_texture", 0);
+    // --- position camera to look at the center of the spawn chunk ---
+    {
+        int centerX = (CHUNK_SIZE_X * 4) / 2;;
+        int centerZ = (CHUNK_SIZE_Z * 4) / 2;
+        float groundH = (float)world.sample_height(centerX, centerZ);
 
-    // glEnable(GL_DEPTH_TEST);
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK); // culling back side
-    // glFrontFace(GL_CCW); // define front side as counter clockwise
+        glm::vec3 target = glm::vec3((float)centerX, groundH, (float)centerZ);
+        glm::vec3 camPos = target + glm::vec3(-20.0f, 25.0f, -20.0f);
+        camera.Position = camPos;
 
-    // main loop
-    while (!glfwWindowShouldClose(window)) {
+        glm::vec3 front = glm::normalize(target - camPos);
+        camera.Front = front;
+        camera.Yaw   = glm::degrees(std::atan2(front.z, front.x));
+        camera.Pitch = glm::degrees(std::asin(front.y));
+        
+        camera.updateCameraVectors();
+
+        std::printf("[Camera /main] camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)\n",
+            camera.Position.x, camera.Position.y, camera.Position.z,
+            target.x, target.y, target.z);
+    }
+
+    while(!glfwWindowShouldClose(window)) {
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+        processInput(window);
 
-        key_callback(window);
-        glfwPollEvents();
+        world.update(camera.Position.x, camera.Position.z, viewDistance);
 
-        glClearColor(0.35f, 0.55f, 0.85f, 1.0f);
+        glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-    //     ourShader.use();
 
-    //     glm::mat4 view = camera.GetViewMatrix();
-    //     projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+        glm::mat4 viewProj = projection * view;
 
-    //     size_t total = world.chunks_size * world.chunks_size;
-    //     for (size_t i = 0; i < total; ++i) {
-    //         struct Chunk* chunk = world.chunks[i];
-    //         if (!chunk || !chunk->mesh->uploaded) continue;
-            
-    //         glm::mat4 model = glm::mat4(1.0f);
-    //         // もし mesh がチャンクローカル座標で作られているなら translate を入れる:
-    //         // model = glm::translate(model, glm::vec3((float)chunk->position.x, (float)chunk->position.y, (float)chunk->position.z));
-    //         glm::mat4 mvp = projection * view * model;
-    //         ourShader.setMat4("uMVP", mvp);
-
-    //         chunkmesh_render(chunk->mesh, CHUNK_MESH_OPAQUE);
-    //     }
-    //     glfwSwapBuffers(window);
+        worldrenderer.render(world, camera.Position, viewProj, viewDistance);
+    
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
-    // world_destroy(&world);
+    worldrenderer.~WorldRenderer();
+    world.destroy();
     glfwDestroyWindow(window);
     glfwTerminate();
-    return 0;
+
+    return EXIT_SUCCESS;
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+}
+
+void processInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.ProcessKeyboard(util::FORWARD, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.ProcessKeyboard(util::BACKWARD, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.ProcessKeyboard(util::LEFT, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.ProcessKeyboard(util::RIGHT, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        camera.ProcessKeyboard(util::TOP, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        camera.ProcessKeyboard(util::BOTTOM, deltaTime);
+    }
+}
+
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (firstMouse) {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // y軸は下が正のため反転
+    lastX = xpos;
+    lastY = ypos;
+
+    camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    camera.Zoom -= (float)yoffset;
+    if (camera.Zoom < 1.0f)
+        camera.Zoom = 1.0f;
+    if (camera.Zoom > 130.0f)
+        camera.Zoom = 130.0f;
 }

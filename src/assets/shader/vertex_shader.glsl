@@ -22,7 +22,6 @@ void main() {
     vTex = aTex;
     vDist = distance(worldPos, uViewPos);
     vLayer = aTextureLayer;
-
     // vTex = aTex;
     vDist = distance(worldPos, uViewPos);
 
@@ -36,5 +35,4 @@ void main() {
     else                     normal = vec3(0, 1, 0);
 
     vLight = max(dot(normal, normalize(uSunDir)), 0.5);
-    // vLight = 1.0;
 }

@@ -11,8 +11,8 @@ namespace ocm {
         COBBLESTONE = 5,
         WATER = 6,
         LOG = 7,
-        PLANKS = 8,
-        LEAVES = 9,
+        LEAVES = 8,
+        CACTUS = 9,
         COAL_ORE = 10,
         IRON_ORE = 11,
     };

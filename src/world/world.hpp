@@ -26,7 +26,8 @@ namespace ocm {
             float grad(int hash, float x, float y, float z) const;
             float perlin_noise(float x, float y, float z) const;
             float fractal_noise(float x, float z, int octaves, float persistence, float lacunarity) const;
-    
+            
+            float get_noise_random(int x, int z);
             void generate_chunk(int cx, int cz);
             void generate_world(int width, int depth);
             BlockID get_block(int wx, int wy, int wz) const;

@@ -104,49 +104,76 @@ namespace ocm {
         for (int y = 0; y < CHUNK_SIZE_Y; y++) {
             for (int z = 0; z < CHUNK_SIZE_Z; z++) {
                 for (int x = 0; x < CHUNK_SIZE_X; x++) {
-                    uint8_t block = chunk->get_block(x, y, z);
-                    if (block == 0) continue; // AIR
+                    BlockID block = static_cast<BlockID>(chunk->get_block(x, y, z));
+                    if (block == BlockID::AIR) continue; // AIR
 
                     int wx = cx * CHUNK_SIZE_X + x;
                     int wy = y;
                     int wz = cz * CHUNK_SIZE_Z + z;
 
-                    bool is_water = (block == static_cast<uint8_t>(BlockID::WATER));
+                    bool is_water = (block == BlockID::WATER);
 
                     // 格納先の参照を切り替える
                     auto& target_vertices = is_water ? result.trans_vertices : result.opaque_vertices;
                     auto& target_indices = is_water ? result.trans_indices : result.opaque_indices;
                     auto& target_offset = is_water ? transparent_vertex_offset : opaque_vertex_offset;
 
-                    auto shuold_add_face = [&](int nx, int ny, int nz) {
-                        uint8_t neighbor = static_cast<uint8_t>(world.get_block(nx, ny, nz));
+                    auto shuold_add_face = [&](int nx, int ny, int nz, BlockID id) {
+                        BlockID neighbor = world.get_block(nx, ny, nz);
 
-                        if (neighbor == 0) return true; // AIR
+                        // 隣が空気なら描画
+                        if (neighbor == BlockID::AIR) return true; // AIR
+
+                        // 自身がサボテン
+                        if (id == BlockID::CACTUS) {
+                            // 隣がサボテンなら描画しない
+                            if (neighbor == BlockID::CACTUS) return false;
+                            return true;
+                        }
+
+                        // 不透明ブロック
+                        if (world.is_opaque(wx, wy, wz)) {
+                            // 隣が空気・水・サボテン・葉なら描画
+                            if (neighbor == BlockID::WATER || neighbor == BlockID::CACTUS || neighbor == BlockID::LEAVES) {
+                                return true;
+                            }
+                            // 隣が不透明ブロックなら描画しない
+                            return world.is_opaque(nx, ny, nz) ? false : true;
+                        }
+
+                        // 自身が葉
+                        if (id == BlockID::LEAVES) {
+                            // 隣が空気や水なら描画
+                            return (neighbor == BlockID::AIR || neighbor == BlockID::WATER);
+                        }
+
 
                         if (is_water) {
                             return false;
                         } else {
-                            return (neighbor == static_cast<uint8_t>(BlockID::WATER));
+                            return (neighbor == BlockID::WATER);
                         }
+                        
+                        return world.is_opaque(nx, ny, nz);
                     };
     
-                    if (shuold_add_face(wx, wy + 1, wz)) {
-                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::TOP, target_offset, block);
+                    if (shuold_add_face(wx, wy + 1, wz, block)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::TOP, target_offset, static_cast<uint8_t>(block));
                     }
-                    if (wy > 0 && shuold_add_face(wx, wy - 1, wz)) {
-                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::BOTTOM, target_offset, block);
+                    if (wy > 0 && shuold_add_face(wx, wy - 1, wz, block)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::BOTTOM, target_offset, static_cast<uint8_t>(block));
                     }
-                    if (shuold_add_face(wx, wy, wz + 1)) {
-                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_FRONT, target_offset, block);
+                    if (shuold_add_face(wx, wy, wz + 1, block)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_FRONT, target_offset, static_cast<uint8_t>(block));
                     }
-                    if (shuold_add_face(wx, wy, wz - 1)) {
-                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_BACK, target_offset, block);
+                    if (shuold_add_face(wx, wy, wz - 1, block)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_BACK, target_offset, static_cast<uint8_t>(block));
                     }
-                    if (shuold_add_face(wx + 1, wy, wz)) {
-                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_RIGHT, target_offset, block);
+                    if (shuold_add_face(wx + 1, wy, wz, block)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_RIGHT, target_offset, static_cast<uint8_t>(block));
                     }
-                    if (shuold_add_face(wx - 1, wy, wz)) {
-                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_LEFT, target_offset, block);
+                    if (shuold_add_face(wx - 1, wy, wz, block)) {
+                        Chunk::add_face(target_vertices, target_indices, x, y, z, FaceDirection::SIDE_LEFT, target_offset, static_cast<uint8_t>(block));
                     }
                 }
             }
